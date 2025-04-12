@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:latest # Use a specific version like postgres:16 or postgres:latest
+    container_name: mindmap_postgres
+    environment:
+      POSTGRES_USER: user        # Replace with your desired user if different
+      POSTGRES_PASSWORD: password  # Replace with your desired password if different
+      POSTGRES_DB: appdb       # Replace with your desired DB name if different
+    ports:
+      - "5432:5432" # Map container port 5432 to host port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persist data using a named volume
+    restart: unless-stopped
+
+volumes:
+  postgres_data: # Define the named volume for data persistence 
