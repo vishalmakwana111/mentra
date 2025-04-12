@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -11,6 +11,7 @@ class GraphNode(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     label = Column(String, index=True)
+    node_type = Column(String, index=True, nullable=False, default='note')
     # Store flexible node properties (e.g., description, source_type)
     data = Column(JSON) # Using JSON for flexibility
     # Store position for frontend rendering

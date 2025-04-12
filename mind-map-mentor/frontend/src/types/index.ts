@@ -18,7 +18,8 @@ export interface Note {
   updated_at: string | null; // Or Date
 }
 
-export interface File {
+// Renamed from File to avoid conflict with global File type
+export interface ApiFile {
   id: number;
   user_id: number;
   filename: string;
@@ -41,18 +42,59 @@ export interface NoteUpdateData {
   position_y?: number | null; // Position is optional for update
 }
 
-// GraphNode and GraphEdge types
-export interface GraphNode {
+// --- Graph Representation Types (for Frontend/React Flow) ---
+
+// Common properties for any graph node data payload
+interface BaseGraphNodeData {
+    id: number; // Corresponds to Note ID or File ID
+    label: string; // Display label (from Note title or File filename)
+    // Store original position if available (e.g., from Note)
+    // React Flow manages the node's rendered position separately
+    position_x?: number | null; 
+    position_y?: number | null;
+}
+
+// Specific data for a note node
+interface NoteNodeData extends BaseGraphNodeData {
+    type: 'note';
+    content: string | null;
+    // Include other relevant note fields if needed for display/interaction
+    created_at: string;
+    updated_at: string | null;
+    // You might want to include the original Note object for reference
+    // originalNote: Note; 
+}
+
+// Specific data for a file node
+interface FileNodeData extends BaseGraphNodeData {
+    type: 'file';
+    filename: string; // Keep original filename for potential use
+    mime_type: string | null;
+    size: number | null;
+    // Include other relevant file fields if needed
+    created_at: string;
+    // You might want to include the original ApiFile object for reference
+    // originalFile: ApiFile;
+}
+
+// The unified type for React Flow node data payload
+export type GraphNodeData = NoteNodeData | FileNodeData;
+
+
+// --- Backend Graph Types (for reference, match backend models/schemas) ---
+
+// GraphNode and GraphEdge types matching backend (if needed for direct use)
+export interface BackendGraphNode {
     id: number;
     user_id: number;
     label: string | null;
     data: { [key: string]: any } | null;
-    position: { x: number; y: number } | null;
+    position: { x: number; y: number } | null; // Assuming backend stores position
     created_at: string;
     updated_at: string | null;
 }
 
-export interface GraphEdge {
+export interface BackendGraphEdge {
     id: number;
     user_id: number;
     source_node_id: number;
@@ -63,12 +105,5 @@ export interface GraphEdge {
     updated_at: string | null;
 }
 
-// Placeholder for edge creation data (if needed for API)
-// export interface GraphEdgeCreateData {
-//   source_node_id: number;
-//   target_node_id: number;
-//   relationship_type?: string | null;
-//   data?: { [key: string]: any } | null;
-// }
-
+// Remove the old placeholder comment
 // Add GraphNode and GraphEdge types later 

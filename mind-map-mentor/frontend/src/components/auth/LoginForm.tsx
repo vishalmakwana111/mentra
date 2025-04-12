@@ -5,6 +5,7 @@ import { loginUser } from '@/services/api'; // Import API function
 import { useAuthStore } from '@/store/authStore'; // Import Zustand store
 import { useRouter } from 'next/navigation'; // Import useRouter
 import toast from 'react-hot-toast'; // Import toast
+import Link from 'next/link'; // Import Link
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -86,6 +87,14 @@ const LoginForm: React.FC = () => {
       >
         {isLoading ? 'Logging in...' : 'Login'}
       </button>
+
+      {/* Add link to Signup page */}
+      <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+        Don't have an account?{' '}
+        <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+          Sign up
+        </Link>
+      </p>
     </form>
   );
 };

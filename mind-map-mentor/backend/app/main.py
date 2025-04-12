@@ -1,10 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 # Import the main API router
 from app.api.api_v1.api import api_router
+from app.core.config import settings
+from app.core.storage import ensure_storage_path_exists # Import the util
 
-app = FastAPI(title="Mind Map Mentor API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code to run on startup
+    print("Starting up...")
+    ensure_storage_path_exists() # Ensure storage path exists
+    yield
+    # Code to run on shutdown
+    print("Shutting down...")
+
+app = FastAPI(
+    title="Mind Map Mentor API",
+    openapi_url=f"/api/v1/openapi.json",
+    lifespan=lifespan # Add the lifespan context manager
+)
 
 # Configure CORS
 origins = [

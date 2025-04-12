@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 # Shared properties (metadata)
 class FileBase(BaseModel):
@@ -17,6 +17,7 @@ class FileInDBBase(FileBase):
     id: int
     user_id: int
     storage_path: str # Internal path, may not expose directly
+    graph_node_id: Optional[int] = None # Add the FK ID
     created_at: datetime
 
     model_config = {
@@ -27,8 +28,22 @@ class FileInDBBase(FileBase):
 class File(FileBase):
     id: int
     user_id: int
+    graph_node_id: Optional[int] = None # Add the FK ID here too
     created_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
 
 # Additional properties stored in DB
 # class FileInDB(FileInDBBase):
-#     pass 
+#     pass
+
+# Schema for paginated response
+class FilesPage(BaseModel):
+    items: List[File]
+    total: int
+
+    model_config = {
+        "from_attributes": True
+    } 

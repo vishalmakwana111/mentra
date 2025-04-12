@@ -9,26 +9,26 @@ from app.db.session import get_db
 # Placeholder for notes endpoints
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.Note], summary="List notes for the current user")
-async def list_notes(
-    db: Session = Depends(get_db),
+@router.get("/", response_model=schemas.NotesPage, summary="List notes for the current user")
+def list_notes(
+    db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
     current_user: models.User = Depends(deps.get_current_active_user)
 ):
-    """Retrieve notes for the current user."""
-    notes = crud.get_notes_for_user(db, user_id=current_user.id, skip=skip, limit=limit)
-    return notes
+    """Retrieve notes for the current user with pagination metadata."""
+    notes, total = crud.get_notes_for_user(db, user_id=current_user.id, skip=skip, limit=limit)
+    return schemas.NotesPage(items=notes, total=total)
 
 @router.post("/", response_model=schemas.Note, status_code=status.HTTP_201_CREATED, summary="Create a new note")
 async def create_note(
     *, # Requires keyword args
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     note_in: schemas.NoteCreate,
     current_user: models.User = Depends(deps.get_current_active_user)
 ):
-    """Create new note for the current user."""
-    note = crud.create_note_for_user(db=db, note_in=note_in, user_id=current_user.id)
+    """Create a new note for the current user."""
+    note = crud.create_note(db=db, note_in=note_in, user_id=current_user.id)
     return note
 
 @router.get("/{note_id}", response_model=schemas.Note, summary="Get a specific note by ID")

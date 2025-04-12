@@ -1,7 +1,9 @@
 'use client'; // Dashboard needs client components
 
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import AuthGuard from "@/components/layout/AuthGuard"; // Import AuthGuard
+// Remove DashboardLayout import
+// import DashboardLayout from "@/components/layout/DashboardLayout";
+// Remove AuthGuard import (handled by layout)
+// import AuthGuard from "@/components/layout/AuthGuard"; 
 import { ReactFlowProvider } from 'reactflow';
 import dynamic from 'next/dynamic';
 
@@ -13,14 +15,10 @@ const MindMapCanvasNoSSR = dynamic(() => import('@/components/mindmap/MindMapCan
 
 export default function DashboardPage() {
   return (
-    <AuthGuard> { /* Wrap the dashboard content */}
-      <DashboardLayout>
-        {/* Wrap the part of the tree using React Flow with the provider */}
-        <ReactFlowProvider>
-          {/* Render the dynamically imported canvas */}
-          <MindMapCanvasNoSSR />
-        </ReactFlowProvider>
-      </DashboardLayout>
-    </AuthGuard>
+    // AuthGuard is applied by the layout.tsx file
+    // DashboardLayout is applied by the layout.tsx file
+    <ReactFlowProvider>
+      <MindMapCanvasNoSSR />
+    </ReactFlowProvider>
   );
 } 

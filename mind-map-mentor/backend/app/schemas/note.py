@@ -14,6 +14,7 @@ class NoteBase(BaseModel):
 class NoteCreate(NoteBase):
     # Title might be required on creation, content optional
     title: str
+    content: str # Make content required
 
 # Properties to receive via API on update
 class NoteUpdate(NoteBase):
@@ -24,6 +25,9 @@ class NoteUpdate(NoteBase):
 class NoteInDBBase(NoteBase):
     id: int
     user_id: int
+    position_x: Optional[float] = 0.0 # Default to 0.0 if not set
+    position_y: Optional[float] = 0.0 # Default to 0.0 if not set
+    graph_node_id: Optional[int] = None # Add the FK ID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -41,4 +45,9 @@ class NoteInDB(NoteInDBBase):
 
 # Schema for multiple notes
 class Notes(BaseModel):
-    notes: List[Note] 
+    notes: List[Note]
+
+# Schema for paginated response
+class NotesPage(BaseModel):
+    items: List[Note]
+    total: int 

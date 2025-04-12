@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
+    # File Storage Path
+    FILE_STORAGE_PATH: str = "./storage"
+
     # Add other application settings here as needed
     # e.g., OPENAI_API_KEY: str | None = None
 

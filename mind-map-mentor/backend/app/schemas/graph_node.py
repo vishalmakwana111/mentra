@@ -2,11 +2,16 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+# Nested schema for position
+class Position(BaseModel):
+    x: Optional[float] = None
+    y: Optional[float] = None
+
 # Shared properties
 class GraphNodeBase(BaseModel):
     label: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
-    position: Optional[Dict[str, float]] = None # Assuming position stored as {x: float, y: float}
+    position: Optional[Position] = None # Use the Position schema
 
 # Properties to receive via API on creation
 class GraphNodeCreate(GraphNodeBase):
