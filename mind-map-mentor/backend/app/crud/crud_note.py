@@ -189,7 +189,11 @@ def update_note(
         return None
 
     update_data = note_in.model_dump(exclude_unset=True) 
-    content_updated = 'content' in update_data # Check if content is part of the update
+    # Check if content is being updated BEFORE applying changes
+    content_updated = (
+        'content' in update_data and 
+        update_data['content'] != db_note.content
+    )
 
     for key, value in update_data.items():
         setattr(db_note, key, value)
@@ -240,14 +244,22 @@ def update_note(
              print(f"Skipping GraphNode update: Node {db_note.graph_node_id} not found or fetch error.")
 
     # --- DB Commit ---
-    db.add(db_note)
-    db.commit()
-    db.refresh(db_note)
+    try:
+        db.add(db_note)
+        db.commit()
+        db.refresh(db_note)
+        logger.info(f"Successfully updated note {note_id} in database.")
+    except Exception as db_e:
+        logger.error(f"Database error during update of note {note_id}: {db_e}", exc_info=True)
+        db.rollback()
+        # Decide if we should attempt vector update even if DB commit failed?
+        # Probably not, let's return None here.
+        return None
 
-    # --- Vector Store Update (if content changed) ---
-    if content_updated and db_note.content:
+    # --- Vector Store Update (if content changed AND DB commit succeeded) ---
+    if content_updated and db_note.content: # Check if content was updated and exists
         try:
-            # vector = generate_embedding(db_note.content) # No longer generate embedding here
+            # Use the correct ID format (consistent with create)
             doc_id = f"note_{db_note.id}"
             metadata = {
                 "note_id": db_note.id,
@@ -255,49 +267,62 @@ def update_note(
                 "title": db_note.title,
                 "type": "note"
             }
-            # Pass text content directly to the new upsert function
+            # Call upsert with the NEW content
             upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
-            logger.info(f"Successfully submitted updated note {db_note.id} for embedding and upsert.")
-        except Exception as e:
-            logger.error(f"Failed to submit updated note {db_note.id} for embedding/upsert: {e}")
+            logger.info(f"Successfully submitted updated note {db_note.id} for embedding/upsert.")
+        except Exception as vs_e:
+            # Log error but don't fail the whole operation as DB part succeeded
+            logger.error(f"Failed to submit updated note {db_note.id} for embedding/upsert: {vs_e}")
+    elif content_updated and not db_note.content:
+        # If content was updated to be empty/null, delete the vector
+        try:
+            doc_id = f"note_{db_note.id}"
+            delete_document(doc_id=doc_id)
+            logger.info(f"Deleted vector for note {db_note.id} as content was removed.")
+        except Exception as vs_del_e:
+            logger.error(f"Failed to delete vector for note {db_note.id} after content removal: {vs_del_e}")
 
     return db_note
 
 def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
-    """Deletes a specific note and its linked graph node, ensuring user ownership."""
+    """Deletes a specific note and its linked graph node, ensuring it belongs to the user."""
     db_note = get_note(db, note_id=note_id, user_id=user_id)
     if not db_note:
+        logger.warning(f"Attempted to delete non-existent or unauthorized note {note_id} for user {user_id}")
         return None
 
-    linked_graph_node_id = db_note.graph_node_id
-    note_title_for_log = db_note.title # Store before delete
+    graph_node_id_to_delete = db_note.graph_node_id # Store ID before deleting note
+    doc_id_to_delete = f"note_{db_note.id}" # Store vector doc ID
 
-    # --- Delete from Vector Store FIRST ---
-    doc_id = f"note_{note_id}"
     try:
-        delete_document(doc_id=doc_id)
-        logger.info(f"Successfully deleted embedding for note {note_id} from vector store.")
-    except Exception as e:
-        # Log error, but continue with DB deletion
-        logger.error(f"Failed to delete embedding for note {note_id}: {e}")
-
-    # --- Delete from DB ---
-    db.delete(db_note)
-    db.commit()
-    logger.info(f"Deleted Note {note_id} ('{note_title_for_log}') from DB.")
-
-    # If a linked graph node existed, delete it too
-    if linked_graph_node_id is not None:
-        try:
-            deleted_graph_node = crud_graph.delete_graph_node(db, node_id=linked_graph_node_id, user_id=user_id)
-            if deleted_graph_node:
-                 print(f"Deleted linked GraphNode {linked_graph_node_id} for Note {note_id}")
+        # Delete the Note from the database
+        db.delete(db_note)
+        logger.info(f"Deleted note {note_id} from database.")
+        
+        # If a GraphNode was linked, delete it too
+        if graph_node_id_to_delete is not None:
+            deleted_node = crud_graph.delete_graph_node(db, node_id=graph_node_id_to_delete, user_id=user_id)
+            if deleted_node:
+                logger.info(f"Deleted linked graph node {graph_node_id_to_delete}.")
             else:
-                 print(f"Could not find/delete linked GraphNode {linked_graph_node_id} for Note {note_id} (already deleted?)")
-        except Exception as e:
-            print(f"Error deleting linked GraphNode {linked_graph_node_id} for Note {note_id}: {e}")
-            # Log this inconsistency
-            
-    # Consider returning just the ID or success boolean
-    return db_note # Returning the object is potentially misleading
-    # Consider returning the ID or None: return note_id or return None 
+                logger.warning(f"Could not delete linked graph node {graph_node_id_to_delete} (may not exist or auth issue).")
+        
+        # Commit DB changes (note and potential graph node deletion)
+        db.commit()
+        logger.info(f"Committed DB deletions for note {note_id}.")
+
+    except Exception as db_e:
+        logger.error(f"Database error during deletion of note {note_id}: {db_e}", exc_info=True)
+        db.rollback()
+        # Do not proceed with vector deletion if DB delete failed
+        return None 
+
+    # Delete the vector from Pinecone (AFTER successful DB commit)
+    try:
+        delete_document(doc_id=doc_id_to_delete)
+        logger.info(f"Successfully deleted vector {doc_id_to_delete} from Pinecone.")
+    except Exception as vs_e:
+        # Log error, but the main deletion was successful
+        logger.error(f"Failed to delete vector {doc_id_to_delete} for note {note_id}: {vs_e}")
+
+    return db_note # Return the deleted note object (transient state) 

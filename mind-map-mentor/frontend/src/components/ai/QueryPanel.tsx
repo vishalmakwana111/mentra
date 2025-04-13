@@ -1,81 +1,86 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useSearchStore } from '@/store/searchStore'; // Import the store
-import { FiX } from 'react-icons/fi'; // Import an icon for the clear button
+import { useSearchStore } from '@/store/searchStore'; // Import Zustand store
+import { FiSearch, FiXCircle } from 'react-icons/fi'; // Icons
 
 const QueryPanel: React.FC = () => {
-  // State for the query input
-  const [query, setQuery] = useState<string>('');
-  // Get state and actions from the store
-  const {
-    searchResults,
-    isLoading,
-    error,
-    performSearch,
-    clearSearch
-  } = useSearchStore();
+  const [query, setQuery] = useState('');
+  // Get RAG state from the store
+  const { 
+      performSearch, 
+      clearSearch, 
+      isLoading, 
+      error, 
+      searchResults, // Still needed to potentially show sources or for context
+      ragAnswer // Get the RAG answer
+    } = useSearchStore();
 
-  const handleQuerySubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!query.trim() || isLoading) return; // Ignore empty or if loading
+    if (!query.trim() || isLoading) return;
     performSearch(query);
   };
-
+  
   const handleClear = () => {
-      setQuery(''); // Clear input field
-      clearSearch(); // Clear store state
-  }
+    setQuery('');
+    clearSearch();
+  };
 
   return (
-    <div className="p-4 h-full flex flex-col bg-white">
-      <h2 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2 flex-shrink-0">Ask Mentra</h2>
+    <div className="h-full flex flex-col bg-gray-50 border-l border-gray-200 p-4 space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Ask Mentra</h3>
       
-      {/* Results Area: Takes remaining space, scrolls */}
-      <div className="flex-1 overflow-y-auto mb-4">
-        {isLoading && <p className="text-sm text-gray-500 italic">Searching...</p>}
-        {error && <p className="text-sm text-red-600">Error: {error}</p>}
-        {!isLoading && !error && searchResults.length === 0 && (
-          <p className="text-sm text-gray-500">Ask a question or describe a topic to find related notes.</p>
+      {/* Answer Display Area */}
+      <div className="flex-grow overflow-y-auto p-2 bg-white rounded border border-gray-200 min-h-[100px]">
+        {isLoading && (
+            <p className="text-gray-500 italic">Thinking...</p>
         )}
-        {!isLoading && !error && searchResults.length > 0 && (
-          <p className="text-sm text-green-600">Found {searchResults.length} relevant note(s). Check the highlighted nodes on the canvas.</p>
+        {error && (
+            <p className="text-red-600">Error: {error}</p>
+        )}
+        {ragAnswer && !isLoading && (
+            <div className="prose prose-sm max-w-none text-gray-700">
+                <p>{ragAnswer}</p>
+            </div>
+        )}
+        {!isLoading && !error && !ragAnswer && (
+             <p className="text-gray-400 text-sm">Ask a question about your notes below.</p>
         )}
       </div>
 
-      {/* Query Input Area: At the bottom, doesn't grow/shrink */}
-      <form onSubmit={handleQuerySubmit} className="mt-auto flex-shrink-0 border-t pt-4">
-        <textarea
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          rows={3}
-          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm mb-2 bg-white disabled:bg-gray-100"
-          placeholder="Ask a question about your notes..."
-          disabled={isLoading}
-        />
-        <div className="flex space-x-2">
-            <button 
-              type="submit"
-              className="flex-grow px-4 py-2 bg-indigo-600 text-white font-medium rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!query.trim() || isLoading}
-            >
-              {isLoading ? 'Searching...' : 'Ask AI'}
-            </button>
-            {(searchResults.length > 0 || query || error) && ( // Show clear if results, query, or error exist
-                <button
-                    type="button"
-                    onClick={handleClear}
-                    title="Clear search"
-                    className="p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 rounded-md disabled:opacity-50"
-                    disabled={isLoading}
-                    aria-label="Clear search"
-                >
-                    <FiX className="h-5 w-5" />
-                </button>
-            )}
-        </div>
-      </form>
-
+      {/* Input Form Area - Positioned at the bottom */}
+      <div className="mt-auto">
+          <form onSubmit={handleSubmit} className="space-y-2">
+              <div className="relative">
+                <textarea
+                  rows={3}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 sm:text-sm bg-white text-gray-900 resize-none"
+                  placeholder="Ask a question about your notes..."
+                />
+                {query && (
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 p-1 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400"
+                        aria-label="Clear search"
+                    >
+                        <FiXCircle size={18} />
+                    </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !query.trim()}
+                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FiSearch className="mr-2 h-4 w-4" />
+                {isLoading ? 'Asking...' : 'Ask Mentra'}
+              </button>
+          </form>
+      </div>
     </div>
   );
 };

@@ -103,18 +103,22 @@ def get_vector_store() -> PineconeVectorStore:
 
 def upsert_document(doc_id: str, text_content: str, metadata: Dict[str, Any]):
     """Creates a LangChain Document and upserts it using PineconeVectorStore."""
+    logger.info(f"Attempting to upsert document with ID: {doc_id}") # Log start
     try:
         vector_store = get_vector_store()
         # Create a LangChain Document
         # Note: PineconeVectorStore adds text to metadata by default under 'text' key
         # We can provide our own metadata as well.
         doc = Document(page_content=text_content, metadata=metadata)
-        
+        logger.debug(f"Created LangChain Document object for upsert: {doc}") # Log document structure
+
         # add_documents expects a list. We provide the ID explicitly.
+        logger.debug(f"Calling vector_store.add_documents for ID: {doc_id}...") # Log before Pinecone call
         vector_store.add_documents(documents=[doc], ids=[doc_id])
-        logger.debug(f"Upserted document {doc_id} via PineconeVectorStore.")
+        # Use INFO for successful confirmation
+        logger.info(f"Successfully upserted document {doc_id} via PineconeVectorStore.") # Log success
     except Exception as e:
-        logger.error(f"Failed to upsert document {doc_id} via PineconeVectorStore: {e}")
+        logger.error(f"Failed to upsert document {doc_id} via PineconeVectorStore: {e}", exc_info=True) # Keep exc_info=True for errors
 
 def delete_document(doc_id: str):
     """Deletes a document vector using PineconeVectorStore."""
@@ -126,21 +130,23 @@ def delete_document(doc_id: str):
         logger.error(f"Failed to delete document {doc_id} via PineconeVectorStore: {e}")
 
 def query_similar_notes(
-    query_text: str, 
+    query_text: str,
     user_id: int, # Add user_id parameter
-    top_k: int = 5, 
+    top_k: int = 5,
     filter: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
-    """Finds notes similar to the query text using PineconeVectorStore, filtered by user_id."""
+    """Finds notes similar to the query text using PineconeVectorStore, filtered by user_id.
+       Now returns a list of dicts, each containing 'id', 'score', 'metadata', and 'page_content'.
+    """
     # Ensure base filter includes the user_id
-    final_filter = {"user_id": user_id} 
+    final_filter = {"user_id": user_id}
     if filter: # Allow merging with other potential filters if needed later
         final_filter.update(filter)
 
     logger.info(f"Attempting vector search for query: '{query_text}', user_id: {user_id}, top_k={top_k}, filter={final_filter}")
     try:
         vector_store = get_vector_store()
-        
+
         logger.debug(f"Calling vector_store.similarity_search_with_score...")
         results_with_scores = vector_store.similarity_search_with_score(
             query=query_text,
@@ -148,38 +154,40 @@ def query_similar_notes(
             filter=final_filter # Use the final filter with user_id
         )
         logger.debug(f"vector_store.similarity_search_with_score returned: {results_with_scores}")
-        
+
         # Process results
         similar_notes_data = []
-        for doc, score in results_with_scores:
+        for doc, score in results_with_scores: # doc is a LangChain Document object
+            page_content = doc.page_content  # Extract page content
             metadata = doc.metadata or {}
-            
+
             # Extract note_id as int
             note_id_float = metadata.get('note_id')
             note_id = int(note_id_float) if note_id_float is not None else None
-            
+
             # Extract user_id as int
             user_id_float = metadata.get('user_id')
-            user_id = int(user_id_float) if user_id_float is not None else None
+            retrieved_user_id = int(user_id_float) if user_id_float is not None else None # Use different variable name
 
             # Update metadata dict in-place with integer versions if they exist
             if note_id is not None:
                 metadata['note_id'] = note_id
-            if user_id is not None:
-                metadata['user_id'] = user_id
+            if retrieved_user_id is not None:
+                metadata['user_id'] = retrieved_user_id # Update with the int version
 
             # Construct vector ID using integer note_id
             vector_id = f"note_{note_id}" if note_id is not None else None
 
             if vector_id:
                 similar_notes_data.append({
-                    'id': vector_id, 
+                    'id': vector_id,
                     'score': score,
-                    'metadata': metadata, # Return updated metadata with ints
+                    'metadata': metadata,
+                    'page_content': page_content # <-- Add page_content here
                 })
             else:
                 logger.warning(f"Could not determine vector ID from metadata for a search result: {metadata}")
-        
+
         logger.debug(f"Processed {len(similar_notes_data)} similar notes for query via PineconeVectorStore.")
         return similar_notes_data
 

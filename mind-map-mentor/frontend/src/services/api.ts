@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/authStore'; // Import Zustand store
 import {
   Note, NoteUpdateData, User, ApiFile, BackendGraphNode, BackendGraphEdge,
-  SearchResponse, SearchMatch, NoteCreateData
+  SearchResponse, SearchMatch, NoteCreateData, RagQueryRequest, RagQueryResponse
 } from '@/types'; // Import Note, NoteUpdateData, User, File types AND AI types
 
 // Determine Backend URL (adjust if your backend runs elsewhere)
@@ -407,6 +407,18 @@ export const searchNotesApi = async (
   } catch (error: any) {
     console.error('Search Notes API error:', error.response?.data || error.message);
     throw new Error(error.response?.data?.detail || 'Failed to search notes');
+  }
+};
+
+// New RAG Query Function
+export const ragQueryApi = async (query: string): Promise<RagQueryResponse> => {
+  const requestData: RagQueryRequest = { query };
+  try {
+    const response = await apiClient.post<RagQueryResponse>('/ai/rag-query', requestData);
+    return response.data;
+  } catch (error: any) {
+    console.error('RAG Query API error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.detail || 'Failed to get AI answer');
   }
 };
 

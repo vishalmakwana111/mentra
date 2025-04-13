@@ -12,7 +12,7 @@ from app.core.storage import ensure_storage_path_exists # Import the util
 # --- Logging Configuration ---
 # Configure logging to output to stdout with a specific format and level
 logging.basicConfig(
-    level=logging.INFO,  # Set the default level (e.g., INFO, DEBUG)
+    level=logging.DEBUG,  # Set the default level (e.g., INFO, DEBUG)
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout)  # Output logs to the console
