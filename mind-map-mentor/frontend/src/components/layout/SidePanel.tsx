@@ -190,14 +190,25 @@ const SidePanel: React.FC = () => {
     setIsLoadingCreateNote(true);
     // No toast here, modal handles it
     try {
+      console.log("SidePanel: Calling createNote API with:", data);
       const newNote = await createNote(data); // Use data from modal
-      addNoteNode(newNote); // Update graph store
-      // Optionally: If on /notes page, trigger a refresh?
-      closeCreateNoteModal(); // Close modal on success
-    } catch (err: any) {
-      console.error('Create note error from SidePanel via modal:', err);
-      // Re-throw error for the modal to display via toast
-      throw err; 
+      console.log("SidePanel: Note created successfully:", newNote);
+
+      // --- Add Refetch Here --- 
+      // After note creation is successful, refetch all graph data
+      // This ensures the new node AND any auto-created edges are loaded
+      console.log("SidePanel: Refetching graph data after note creation...");
+      await fetchGraphData(); 
+      console.log("SidePanel: Graph data refetch complete.");
+      // --- End Refetch --- 
+
+      // Optionally, trigger other actions like focusing the new node if needed
+
+    } catch (error) {
+      console.error("SidePanel: Failed to create note:", error);
+      // Error is already shown via toast in the modal, but re-throw if needed
+      // for further handling here.
+      throw error; // Re-throw to ensure modal knows about the failure
     } finally {
       setIsLoadingCreateNote(false);
     }

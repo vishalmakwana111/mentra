@@ -9,33 +9,35 @@ class GraphNodeBase(BaseModel):
     label: Optional[str] = None
     node_type: Optional[str] = Field(None, description="Type of node (e.g., 'note', 'file')")
     data: Optional[Dict[str, Any]] = None # Flexible data payload (JSON)
-    # Allow position fields to be None initially
-    position_x: Optional[float] = Field(None, description="X coordinate for frontend rendering")
-    position_y: Optional[float] = Field(None, description="Y coordinate for frontend rendering")
+    # position_x: Optional[float] = Field(None, description="X coordinate for frontend rendering")
+    # position_y: Optional[float] = Field(None, description="Y coordinate for frontend rendering")
 
 class GraphNodeCreate(GraphNodeBase):
     # Type is required on creation
     label: str # Label is required on creation
     node_type: str = "note" # Default to note type
-    # Optional: Add specific fields required only on creation if any
-    pass
+    # Add position_x/y here for API input
+    position_x: Optional[float] = None 
+    position_y: Optional[float] = None
 
-class GraphNodeUpdate(GraphNodeBase):
+class GraphNodeUpdate(BaseModel): # Don't inherit from GraphNodeBase to avoid conflicts
     # All fields are optional on update
     label: Optional[str] = None
     node_type: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
     # Add the position field to allow direct dictionary updates
     position: Optional[Dict[str, float]] = None 
-    # position_x: Optional[float] = None # Keep commented/removed
-    # position_y: Optional[float] = None
+    # Add position_x/y here for API input
+    position_x: Optional[float] = None
+    position_y: Optional[float] = None
 
 # Properties shared by models stored in DB
 class GraphNodeInDBBase(GraphNodeBase):
     id: int
     user_id: int
     # The underlying model has a 'position' JSON field
-    position: Optional[Dict[str, float]] = None 
+    # Allow Any type within the dict initially to handle legacy {"x": null} data
+    position: Optional[Dict[str, Any]] = None 
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -45,14 +47,28 @@ class GraphNodeInDBBase(GraphNodeBase):
 
 # Properties to return to client
 class GraphNode(GraphNodeInDBBase):
-    # Add position_x and position_y derived from the position JSON
-    # These should also be optional to handle cases where position is None
-    position_x: Optional[float] = Field(None, validation_alias='position.x')
-    position_y: Optional[float] = Field(None, validation_alias='position.y')
+    # Keep computed fields - they will safely handle the Dict[str, Any]
+    @computed_field
+    @property
+    def position_x(self) -> Optional[float]:
+        if self.position and isinstance(self.position, dict):
+            val = self.position.get('x')
+            try:
+                return float(val) if val is not None else None
+            except (ValueError, TypeError):
+                return None 
+        return None
 
-    class Config:
-        # Ensure aliases are used for population
-        populate_by_name = True
+    @computed_field
+    @property
+    def position_y(self) -> Optional[float]:
+        if self.position and isinstance(self.position, dict):
+            val = self.position.get('y')
+            try:
+                return float(val) if val is not None else None
+            except (ValueError, TypeError):
+                return None
+        return None
 
 # --- Graph Edge Schemas ---
 

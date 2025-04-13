@@ -50,6 +50,10 @@ def create_graph_node(db: Session, node: GraphNodeCreate, user_id: int, commit: 
 
     # Always create position data, defaulting to (0,0)
     position_data = {"x": final_x, "y": final_y}
+    
+    # --- Added Log --- #
+    logger.info(f"Saving GraphNode '{node.label}' with position_data: {position_data}") 
+    # --- End Added Log --- #
 
     db_node = GraphNode(
         user_id=user_id,

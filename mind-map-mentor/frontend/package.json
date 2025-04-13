@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/dagre": "^0.7.52",
     "axios": "^1.8.4",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
