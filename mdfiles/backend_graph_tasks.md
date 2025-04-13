@@ -1,0 +1,26 @@
+# Task: Backend Graph Implementation
+
+- [x] 1.  **Define Generic Graph Schemas:**
+    - [x] In `app/schemas/graph.py` (create if it doesn't exist), define Pydantic schemas for generic graph nodes and edges:
+        - `GraphNodeBase`, `GraphNodeCreate`, `GraphNodeUpdate`, `GraphNode` (for API responses)
+        - `GraphEdgeBase`, `GraphEdgeCreate`, `GraphEdgeUpdate`, `GraphEdge` (for API responses)
+    - [x] These schemas should accommodate different node types (initially 'note' and 'file', potentially more later) using a `node_type` field and possibly a flexible `data` field (JSONB). They should reference the existing `GraphNode` and `GraphEdge` *models*.
+- [x] 2.  **Implement Generic Graph CRUD:**
+    - [x] In `app/crud/crud_graph.py` (create if it doesn't exist), implement CRUD functions for the generic `GraphNode` and `GraphEdge` SQLAlchemy models.
+        - `create_graph_node`, `get_graph_node`, `get_graph_nodes_for_user`, `update_graph_node`, `delete_graph_node`
+        - `create_graph_edge`, `get_graph_edge`, `get_graph_edges_for_user`, `update_graph_edge`, `delete_graph_edge`
+    - [x] Ensure user ownership checks are performed.
+- [x] 3.  **Implement Generic Graph API Endpoints:**
+    - [x] In `app/api/api_v1/endpoints/graph.py` (create if it doesn't exist or refactor existing), implement API endpoints for generic nodes and edges using the new schemas and CRUD functions.
+        - `/graph/nodes/`: POST (create), GET (list)
+        - `/graph/nodes/{node_id}`: GET (retrieve), PUT (update), DELETE (remove)
+        - `/graph/edges/`: POST (create), GET (list)
+        - `/graph/edges/{edge_id}`: GET (retrieve), PUT (update), DELETE (remove)
+    - [x] Ensure endpoints require authentication (`Depends(deps.get_current_active_user)`).
+- [x] 4.  **Refactor Frontend API Service:**
+    - [x] Update `frontend/src/services/api.ts` to use the new generic graph endpoints for fetching edges (`fetchGraphEdges`) and potentially creating/deleting edges (`createGraphEdge`, `deleteGraphEdge`).
+    - [x] Consider if fetching generic nodes is needed yet or if the specific `fetchNotes` and `fetchFiles` are sufficient for now.
+- [ ] 5.  **Database Migration:**
+    - [x] Run `alembic revision --autogenerate -m "Add node_type to graph_nodes table"` to generate a migration script (if schema changes were needed, though likely based on existing models).
+    - [x] Review the generated script.
+    - [ ] Apply the migration: `alembic upgrade head`.

@@ -1,12 +1,26 @@
+'use client';
+
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { FileNodeData } from '@/types'; // Import the specific data type
+import { useSearchStore } from '@/store/searchStore'; // Import the search store
+import clsx from 'clsx'; // Utility for conditional classes
 
 // Using memo for performance optimization
-const FileNode: React.FC<NodeProps<FileNodeData>> = memo(({ data }) => {
+const FileNode: React.FC<NodeProps<FileNodeData>> = memo(({ data, id }) => { // Destructure id
+  // Get highlighted IDs from the store
+  const highlightedNodeIds = useSearchStore((state) => state.highlightedNodeIds);
+  const isHighlighted = highlightedNodeIds.includes(id); // Check if this node should be highlighted
+
   return (
-    // Apply same styling as NoteNode
-    <div className="custom-note-node bg-yellow-100 border border-yellow-300 rounded-md shadow-lg overflow-hidden min-w-[180px]">
+    // Apply same styling as NoteNode, plus highlighting
+    <div 
+      className={clsx(
+        'custom-file-node bg-blue-100 border border-blue-300 rounded-md shadow-lg overflow-hidden min-w-[180px]',
+        // Apply highlighting styles conditionally
+        isHighlighted && 'ring-4 ring-offset-1 ring-purple-500 border-purple-500'
+      )}
+    >
       {/* Input Handle (Top) - Styled like NoteNode */}
       <Handle 
         type="target" 
@@ -17,8 +31,8 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = memo(({ data }) => {
       {/* Node Content */}
       <div className="p-3">
          {/* Use same title styling, display file icon and filename */}
-        <div className="font-bold text-sm text-gray-800 mb-1 truncate" title={data.label}>
-             📄 {data.label}
+        <div className="font-bold text-sm text-gray-800 mb-1 truncate" title={data.label || data.filename}>
+             📄 {data.label || data.filename}
         </div>
          {/* Optional: Add file type or size here if desired, styled similarly */}
          {/* <p className="text-xs text-gray-600">{data.mime_type}</p> */}

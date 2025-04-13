@@ -7,14 +7,16 @@ from datetime import datetime
 class GraphNodeBase(BaseModel):
     # General node properties
     label: Optional[str] = None
-    node_type: str = Field(..., description="Type of the node (e.g., 'note', 'file', 'concept')")
+    node_type: Optional[str] = Field(None, description="Type of node (e.g., 'note', 'file')")
     data: Optional[Dict[str, Any]] = None # Flexible data payload (JSON)
-    # position_x: Optional[float] = None # These will be computed
-    # position_y: Optional[float] = None
+    # Allow position fields to be None initially
+    position_x: Optional[float] = Field(None, description="X coordinate for frontend rendering")
+    position_y: Optional[float] = Field(None, description="Y coordinate for frontend rendering")
 
 class GraphNodeCreate(GraphNodeBase):
     # Type is required on creation
-    node_type: str
+    label: str # Label is required on creation
+    node_type: str = "note" # Default to note type
     # Optional: Add specific fields required only on creation if any
     pass
 
@@ -43,18 +45,14 @@ class GraphNodeInDBBase(GraphNodeBase):
 
 # Properties to return to client
 class GraphNode(GraphNodeInDBBase):
-    # Add computed fields to extract x and y from the position dict
-    @computed_field
-    @property
-    def position_x(self) -> Optional[float]:
-        return self.position.get('x') if self.position else None
+    # Add position_x and position_y derived from the position JSON
+    # These should also be optional to handle cases where position is None
+    position_x: Optional[float] = Field(None, validation_alias='position.x')
+    position_y: Optional[float] = Field(None, validation_alias='position.y')
 
-    @computed_field
-    @property
-    def position_y(self) -> Optional[float]:
-        return self.position.get('y') if self.position else None
-    
-    pass # Keep pass if no other overrides needed
+    class Config:
+        # Ensure aliases are used for population
+        populate_by_name = True
 
 # --- Graph Edge Schemas ---
 

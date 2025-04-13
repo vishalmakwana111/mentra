@@ -1,3 +1,5 @@
+import logging
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -6,6 +8,17 @@ from contextlib import asynccontextmanager
 from app.api.api_v1.api import api_router
 from app.core.config import settings
 from app.core.storage import ensure_storage_path_exists # Import the util
+
+# --- Logging Configuration ---
+# Configure logging to output to stdout with a specific format and level
+logging.basicConfig(
+    level=logging.INFO,  # Set the default level (e.g., INFO, DEBUG)
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Output logs to the console
+    ]
+)
+# --- End Logging Configuration ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

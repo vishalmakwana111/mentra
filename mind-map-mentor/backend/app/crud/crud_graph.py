@@ -1,11 +1,14 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified # Import flag_modified
 from typing import List, Optional
+import logging # Add logging
 
 from app.models.graph_node import GraphNode
 from app.models.graph_edge import GraphEdge
 from app.schemas.graph import GraphNodeCreate, GraphNodeUpdate, GraphEdgeCreate, GraphEdgeUpdate
 from app.db.base import Base # Used for potential type hinting if needed
+
+logger = logging.getLogger(__name__) # Add logger
 
 # --- GraphNode CRUD --- #
 
@@ -26,17 +29,34 @@ def create_graph_node(db: Session, node: GraphNodeCreate, user_id: int, commit: 
     """Create a new graph node.
     Optionally commits the session.
     """
-    # Map position_x/y from schema to position JSON in model
-    position_data = None
+    final_x: float = 0.0
+    final_y: float = 0.0
+
     if node.position_x is not None and node.position_y is not None:
-        position_data = {"x": node.position_x, "y": node.position_y}
-        
+        try:
+            # Attempt to use provided values
+            final_x = float(node.position_x)
+            final_y = float(node.position_y)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid position data provided during creation for node '{node.label}'. Defaulting to (0,0).")
+            # Keep default 0.0 values
+            final_x = 0.0
+            final_y = 0.0
+    else:
+        # If not both provided, explicitly use defaults
+        logger.info(f"Position not fully provided for node '{node.label}'. Defaulting to (0,0).")
+        final_x = 0.0
+        final_y = 0.0
+
+    # Always create position data, defaulting to (0,0)
+    position_data = {"x": final_x, "y": final_y}
+
     db_node = GraphNode(
         user_id=user_id,
         label=node.label,
-        node_type=node.node_type, # Set node_type from schema
-        data=node.data, 
-        position=position_data
+        node_type=node.node_type,
+        data=node.data,
+        position=position_data # Always set position data
     )
     db.add(db_node)
     
@@ -58,38 +78,99 @@ def update_graph_node(
         return None
 
     update_data = node_update.model_dump(exclude_unset=True)
-    
-    # --- Refined Position Handling --- 
-    new_position_data = None # Initialize
-    # Check if position is provided as x/y coordinates
-    if "position_x" in update_data or "position_y" in update_data:
-        current_pos = (db_node.position or {}).copy()
-        new_position_data = {
-            "x": update_data.pop("position_x", current_pos.get("x")),
-            "y": update_data.pop("position_y", current_pos.get("y")),
-        }
-    # Check if position is provided directly as a dict
-    elif "position" in update_data and isinstance(update_data["position"], dict):
-        # Validate/extract x, y from the dict if needed, or just use it directly
+    position_changed = False
+    # Ensure current position is never None; default to 0,0 if DB somehow had NULL
+    current_pos = (db_node.position or {}).copy()
+    current_x = current_pos.get("x", 0.0)
+    current_y = current_pos.get("y", 0.0)
+    new_position_db_value = {"x": current_x, "y": current_y} # Start with current valid values
+
+    # Check if position is being updated via x/y coordinates
+    has_pos_x = "position_x" in update_data
+    has_pos_y = "position_y" in update_data
+
+    if has_pos_x or has_pos_y:
+        provided_x = update_data.pop("position_x", None) if has_pos_x else None
+        provided_y = update_data.pop("position_y", None) if has_pos_y else None
+
+        # Determine final coordinates, defaulting Nones or invalids to 0.0
+        final_x = current_x # Start with current
+        final_y = current_y
+
+        if has_pos_x:
+            try:
+                final_x = float(provided_x) if provided_x is not None else 0.0
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid position_x '{provided_x}' during update for node {node_id}. Defaulting x to 0.0.")
+                final_x = 0.0
+        
+        if has_pos_y:
+             try:
+                final_y = float(provided_y) if provided_y is not None else 0.0
+             except (ValueError, TypeError):
+                logger.warning(f"Invalid position_y '{provided_y}' during update for node {node_id}. Defaulting y to 0.0.")
+                final_y = 0.0
+        
+        potential_new_pos = {"x": final_x, "y": final_y}
+        if potential_new_pos != new_position_db_value: # Compare with the initial state for this update cycle
+            new_position_db_value = potential_new_pos
+            position_changed = True
+
+    # Check for direct position dict update
+    elif "position" in update_data:
         pos_dict = update_data.pop("position")
-        if "x" in pos_dict and "y" in pos_dict: # Basic validation
-             new_position_data = {"x": pos_dict["x"], "y": pos_dict["y"]}
+        temp_x = 0.0
+        temp_y = 0.0
+        valid_dict = False
+        if pos_dict is None:
+            # Explicitly setting position to null means reset to default (0,0)
+            logger.info(f"Received position: null for node {node_id}. Resetting to (0,0).")
+            temp_x = 0.0
+            temp_y = 0.0
+            valid_dict = True 
+        elif isinstance(pos_dict, dict) and "x" in pos_dict and "y" in pos_dict:
+            try:
+                # Attempt to convert, default to 0.0 if None or invalid
+                temp_x = float(pos_dict.get("x")) if pos_dict.get("x") is not None else 0.0
+                temp_y = float(pos_dict.get("y")) if pos_dict.get("y") is not None else 0.0
+                valid_dict = True
+            except (ValueError, TypeError):
+                 logger.warning(f"Invalid position dict data provided during update for node {node_id}: {pos_dict}. Using (0,0).")
+                 temp_x = 0.0
+                 temp_y = 0.0
+                 valid_dict = True # Treat as valid for defaulting purpose
         else:
-            print(f"Warning: Invalid 'position' dict format received: {pos_dict}")
-    
-    # If a valid new position was determined, update the node
-    if new_position_data is not None:
-        db_node.position = new_position_data
-        flag_modified(db_node, "position") # Flag the position field as modified
-    # --- End Refined Position Handling ---
+             logger.warning(f"Invalid or incomplete 'position' dict format received during update for node {node_id}: {pos_dict}. Using (0,0).")
+             temp_x = 0.0
+             temp_y = 0.0
+             valid_dict = True # Default if format is wrong
+             
+        if valid_dict:
+             potential_new_pos = {"x": temp_x, "y": temp_y}
+             if potential_new_pos != new_position_db_value:
+                 new_position_db_value = potential_new_pos
+                 position_changed = True
 
-    # Apply other updates (position, position_x, position_y were popped or handled)
+    # Apply the determined position update if it changed
+    if position_changed:
+        db_node.position = new_position_db_value
+        flag_modified(db_node, "position")
+
+    # Apply other updates (label, node_type, data)
     for key, value in update_data.items():
-        setattr(db_node, key, value)
+        if hasattr(db_node, key):
+             setattr(db_node, key, value)
+        else:
+             logger.warning(f"Attempted to update non-existent attribute '{key}' on GraphNode {node_id}")
 
-    db.add(db_node)
-    db.commit()
-    db.refresh(db_node)
+    db.add(db_node) # Add to session even if no changes (SQLAlchemy handles it)
+    try:
+        db.commit()
+        db.refresh(db_node)
+    except Exception as e:
+         logger.error(f"Database error during update of node {node_id}: {e}", exc_info=True)
+         db.rollback()
+         return None
     return db_node
 
 def delete_graph_node(db: Session, node_id: int, user_id: int) -> Optional[GraphNode]:

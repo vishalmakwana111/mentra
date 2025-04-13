@@ -107,3 +107,102 @@ export interface BackendGraphEdge {
 
 // Remove the old placeholder comment
 // Add GraphNode and GraphEdge types later 
+
+// --- API Response Types ---
+
+export interface User {
+  id: number;
+  email: string;
+  is_active: boolean;
+}
+
+export interface Token {
+  access_token: string;
+  token_type: string;
+}
+
+export interface Note {
+  id: number;
+  user_id: number;
+  title: string;
+  content: string | null; // Keep null possible if backend allows, but make required for creation
+  position_x?: number | null;
+  position_y?: number | null;
+  graph_node_id?: number | null;
+  created_at: string; // Typically string in JSON
+  updated_at?: string | null;
+}
+
+export interface ApiFile {
+  id: number;
+  user_id: number;
+  filename: string;
+  mime_type: string | null;
+  size: number | null;
+  graph_node_id?: number | null;
+  created_at: string;
+}
+
+export interface GraphNode {
+  id: number;
+  user_id: number;
+  label: string | null;
+  data: Record<string, any> | null;
+  position: { x: number | null; y: number | null } | null;
+  created_at: string;
+  updated_at: string | null;
+  node_type: string; // Added in crud_graph.py
+}
+
+export interface GraphEdge {
+  id: number;
+  user_id: number;
+  source_node_id: number;
+  target_node_id: number;
+  label: string | null;
+  data: Record<string, any> | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+// --- API Payload Types ---
+
+export interface NoteCreateData {
+  title: string;
+  content: string; // Content is required now
+  position_x?: number;
+  position_y?: number;
+}
+
+export interface NoteUpdateData {
+  title?: string;
+  content?: string;
+  position_x?: number;
+  position_y?: number;
+}
+
+export interface GraphNodeUpdateData {
+    label?: string;
+    data?: Record<string, any>;
+    position?: { x: number | null; y: number | null };
+}
+
+// --- AI Search Types ---
+export interface SearchMatchMetadata {
+  note_id: number;
+  user_id: number;
+  title: string;
+  type: string; 
+  text?: string; // Text might be included by PineconeVectorStore
+}
+
+export interface SearchMatch {
+  id: string; // Vector ID (e.g., "note_16")
+  score: number | null;
+  metadata: SearchMatchMetadata;
+}
+
+export interface SearchResponse {
+  query: string;
+  results: SearchMatch[];
+} 

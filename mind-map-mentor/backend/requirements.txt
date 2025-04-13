@@ -1,11 +1,29 @@
+# Core FastAPI & DB
 fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 alembic
+
+# Config & Utils
 python-dotenv
 pydantic
 pydantic-settings
+
+# Auth
 passlib[bcrypt]
 python-jose[cryptography]
+
+# File Handling
 python-multipart
+
+# AI / LangChain / Vector Store
+langchain
+langchain-community
+langchain-core
+pinecone-client[grpc]
+langchain-pinecone
+sentence-transformers
+# OpenAI for Embeddings (if used)
+openai
+langchain-openai

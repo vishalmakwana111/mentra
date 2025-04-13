@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore'; // Import Zustand store
-import { Note, NoteUpdateData, User, ApiFile, BackendGraphNode, BackendGraphEdge } from '@/types'; // Import Note, NoteUpdateData, User, File types
+import {
+  Note, NoteUpdateData, User, ApiFile, BackendGraphNode, BackendGraphEdge,
+  SearchResponse, SearchMatch, NoteCreateData
+} from '@/types'; // Import Note, NoteUpdateData, User, File types AND AI types
 
 // Determine Backend URL (adjust if your backend runs elsewhere)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -387,5 +390,24 @@ export const updateFilePosition = async (fileId: number, position: { x: number; 
 
 // Note: Downloading files is usually handled via a simple link (<a href="/api/v1/files/{file_id}/download">)
 // rather than an explicit API call in JavaScript, as the browser handles the download.
+
+// --- AI Service Functions --- //
+
+export const searchNotesApi = async (
+  query: string,
+  top_k: number = 5
+): Promise<SearchResponse> => {
+  try {
+    console.log(`API: Searching notes with query: "${query}", top_k: ${top_k}`);
+    const response = await apiClient.get<SearchResponse>('/ai/search-notes', {
+      params: { query, top_k },
+    });
+    console.log('API: Search response received:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Search Notes API error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.detail || 'Failed to search notes');
+  }
+};
 
 export default apiClient; // Export the configured instance if needed elsewhere 

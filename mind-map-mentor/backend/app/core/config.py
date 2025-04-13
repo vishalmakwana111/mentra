@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -12,6 +13,17 @@ class Settings(BaseSettings):
 
     # File Storage Path
     FILE_STORAGE_PATH: str = "./storage"
+
+    # Pinecone Settings
+    PINECONE_API_KEY: str
+    PINECONE_ENVIRONMENT: str
+    PINECONE_INDEX_NAME: str
+
+    # OpenAI Settings (Optional, e.g., for embeddings)
+    OPENAI_API_KEY: Optional[str] = None
+
+    # AI Feature Settings
+    SIMILARITY_THRESHOLD: float = 0.5# Default threshold for auto-edges
 
     # Add other application settings here as needed
     # e.g., OPENAI_API_KEY: str | None = None

@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link'; // Import Link for navigation
-import { createNote, updateNote, uploadFile, fetchFiles, deleteFile, downloadFileApi, API_SERVER_ORIGIN } from '@/services/api';
-import { Note, NoteUpdateData, ApiFile, GraphNodeData, FileNodeData, NoteCreateData } from '@/types';
+import { Node } from 'reactflow'; // Import Node from reactflow
+import { createNote, updateNote, uploadFile, deleteFile, downloadFileApi } from '@/services/api';
+import { Note, NoteUpdateData, ApiFile, GraphNodeData, NoteCreateData } from '@/types'; // Removed FileNodeData, Node
 import { useAuthStore } from '@/store/authStore';
 import { useGraphStore } from '@/store/graphStore';
 import EditNoteModal from '@/components/notes/EditNoteModal';
@@ -23,14 +24,17 @@ const SidePanel: React.FC = () => {
     addNoteNode, 
     addFileNode,
     removeFileNode, 
-    updateNodeData // Needed for consistency, though maybe not used directly here
+    // updateNodeData // Removed as it wasn't used after refactor
   } = useGraphStore();
   
   // Derive notes list from graphNodes
+  // NOTE: Ensure Node type from reactflow is imported or defined if not global
   const notes = graphNodes
-    .filter((node): node is Node<NoteNodeData> => node.data.type === 'note' && typeof (node.data as any).original_note_id === 'number')
+    .filter((node): node is Node<GraphNodeData & { original_note_id: number, label: string, content: string, position_x?: number, position_y?: number, created_at: string, updated_at: string }> => 
+        node.data.type === 'note' && typeof (node.data as any).original_note_id === 'number'
+    )
     .map(node => {
-        const noteData = node.data; // Already asserted type in filter
+        const noteData = node.data;
         return {
             id: noteData.original_note_id,
             user_id: useAuthStore.getState().user?.id ?? 0,
@@ -45,9 +49,11 @@ const SidePanel: React.FC = () => {
 
   // Derive files list from graphNodes
   const filesForPanel = graphNodes
-      .filter((node): node is Node<FileNodeData> => node.data.type === 'file' && typeof (node.data as any).original_file_id === 'number')
+      .filter((node): node is Node<GraphNodeData & { original_file_id: number, filename: string, mime_type: string, size: number, created_at: string }> => 
+          node.data.type === 'file' && typeof (node.data as any).original_file_id === 'number'
+      )
       .map(node => {
-          const fileData = node.data; // Already asserted type in filter
+          const fileData = node.data;
           // Map back to ApiFile structure for the panel components
           return {
               id: fileData.original_file_id,
@@ -62,7 +68,7 @@ const SidePanel: React.FC = () => {
       });
 
   // Local state for create form loading and modal
-  const [isLoadingCreate, setIsLoadingCreate] = useState(false);
+  // const [isLoadingCreate, setIsLoadingCreate] = useState(false); // Removed, handled by modal
   const { isLoggedIn, user, logout } = useAuthStore();
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -100,12 +106,13 @@ const SidePanel: React.FC = () => {
       console.log("SidePanel: Note updated successfully via API");
       // TODO: Optionally update store directly using updateNodeData if API doesn't return updated node
       // Or rely on fetchGraphData re-fetching after modal close
+      fetchGraphData(); // Re-fetch graph data to get updated note
       closeEditModal();
       toast.success('Note updated successfully!', { id: toastId });
-    } catch (error) {
+    } catch (error: any) {
       console.error("SidePanel: Failed to update note:", error);
-      toast.dismiss(toastId);
-      throw error; 
+      toast.error(error.message || 'Failed to update note', { id: toastId });
+      // Don't throw here if the modal isn't handling it
     } 
   };
 
@@ -116,59 +123,6 @@ const SidePanel: React.FC = () => {
       fetchGraphData(); // Use the combined fetch action
     }
   }, [isLoggedIn, fetchGraphData]);
-
-  // Handle note creation - use addNoteNode
-  const handleCreateNote = async (title: string, content: string) => {
-    setIsLoadingCreate(true);
-    const toastId = toast.loading('Creating note...');
-    try {
-      const newNote = await createNote({ title, content });
-      console.log("SidePanel: Created note via API:", newNote);
-      addNoteNode(newNote); // Update the global store state
-      toast.success('Note created successfully!', { id: toastId });
-    } catch (err: any) {
-      console.error('Create note error from SidePanel:', err);
-      toast.error(err.message || 'Failed to create note.', { id: toastId });
-    } finally {
-      setIsLoadingCreate(false);
-    }
-  };
-
-  // Handle file selection
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
-      console.log("File selected:", event.target.files[0]);
-    } else {
-      setSelectedFile(null);
-    }
-  };
-
-  // Handle file upload trigger - use addFileNode
-  const handleUploadClick = async () => {
-    if (!selectedFile) {
-      toast.error('Please select a file first.');
-      return;
-    }
-    console.log("Uploading file:", selectedFile.name);
-    setIsUploading(true);
-    const toastId = toast.loading('Uploading file...');
-    try {
-      const uploadedFileRecord = await uploadFile(selectedFile);
-      console.log("File uploaded successfully, record:", uploadedFileRecord);
-      addFileNode(uploadedFileRecord); // Add file node to store
-      toast.success('File uploaded successfully!', { id: toastId });
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-          fileInputRef.current.value = ""; 
-      }
-    } catch (err: any) {
-      console.error("File upload error:", err);
-      toast.error(`Upload failed: ${err.message}`, { id: toastId });
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   // Handle downloading a file
   const handleDownloadFile = async (file: ApiFile) => {
@@ -239,6 +193,7 @@ const SidePanel: React.FC = () => {
       const newNote = await createNote(data); // Use data from modal
       addNoteNode(newNote); // Update graph store
       // Optionally: If on /notes page, trigger a refresh?
+      closeCreateNoteModal(); // Close modal on success
     } catch (err: any) {
       console.error('Create note error from SidePanel via modal:', err);
       // Re-throw error for the modal to display via toast
@@ -251,87 +206,114 @@ const SidePanel: React.FC = () => {
   // Handle File Upload (called by modal's onUpload prop)
   const handleFileUploadSubmit = async (file: File) => {
     setIsLoadingUploadFile(true);
-     // No toast here, modal handles it
+    // No toast here, modal handles it
     try {
-      const uploadedFileRecord = await uploadFile(file);
-      addFileNode(uploadedFileRecord); // Add file node to graph store
-       // Optionally: If on /files page, trigger a refresh?
+      const uploadedFileRecord = await uploadFile(file); // Use file from modal
+      addFileNode(uploadedFileRecord); // Add file node to store
+      closeUploadFileModal(); // Close modal on success
     } catch (err: any) {
-      console.error("File upload error from SidePanel via modal:", err);
-      // Re-throw error for the modal to display via toast
+      console.error('File upload error from SidePanel via modal:', err);
+       // Re-throw error for the modal to display via toast
       throw err;
     } finally {
       setIsLoadingUploadFile(false);
     }
   };
 
+  // TODO: Add loading states for notes and files lists?
+  // TODO: Add error states for notes and files lists?
+
   return (
-    <>
-      <div className="w-64 h-screen bg-slate-100 border-r border-slate-200 p-4 flex flex-col">
-        <div className="mb-6">
-           <h1 className="text-2xl font-bold text-violet-700">MindMap</h1> {/* Simple Title */}
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="space-y-3 mb-8">
-            <button 
-                onClick={openCreateNoteModal}
-                className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-                <FiPlusCircle className="mr-2 h-4 w-4" /> Create Note
-            </button>
-             <button 
-                onClick={openUploadFileModal}
-                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-                 <FiUpload className="mr-2 h-4 w-4" /> Upload File
-            </button>
-        </div>
+    // Main container: flex column, full height, padding, spacing
+    <div className="flex flex-col h-full p-4 space-y-4">
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-2">
-          <Link href="/dashboard" className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-slate-200 hover:text-gray-900 group">
-            <FiGrid className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-            Canvas
-          </Link>
-          <Link href="/dashboard/notes" className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-slate-200 hover:text-gray-900 group">
-             <FiFileText className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-            All Notes
-          </Link>
-          <Link href="/dashboard/files" className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-slate-200 hover:text-gray-900 group">
-             <FiFolder className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-            All Files
-          </Link>
-        </nav>
-
-        {/* User Info & Logout */}
-        <div className="mt-auto pt-4 border-t border-slate-300">
-           {user && (
-              <div className="mb-3 text-sm text-gray-600">
-                  Logged in as: <span className="font-medium text-gray-800">{user.email}</span>
-              </div>
-            )}
+      {/* Header Section: Title, Buttons (fixed top) */}
+      <div className="space-y-4 flex-shrink-0">
+        <h2 className="text-2xl font-semibold text-indigo-600">Mentra</h2>
+        <div className="space-y-2">
           <button
-            onClick={logout}
-            className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+            onClick={openCreateNoteModal}
+            className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            disabled={isLoadingCreateNote}
           >
-            <FiLogOut className="mr-2 h-4 w-4" /> Logout
+            <FiPlusCircle className="mr-2 h-5 w-5" />
+            Create Note
+          </button>
+          <button
+            onClick={openUploadFileModal}
+            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            disabled={isLoadingUploadFile}
+          >
+            <FiUpload className="mr-2 h-5 w-5" />
+            Upload File
           </button>
         </div>
       </div>
 
-      {/* Render Modals */}
-      <CreateNoteModal 
-        isOpen={isCreateNoteModalOpen}
-        onClose={closeCreateNoteModal}
-        onCreate={handleCreateNoteSubmit}
-      />
-      <UploadFileModal 
-         isOpen={isUploadFileModalOpen}
-         onClose={closeUploadFileModal}
-         onUpload={handleFileUploadSubmit}
-      />
-    </>
+      {/* Separator */}
+      <hr className="border-gray-200 flex-shrink-0" />
+
+      {/* Middle Section: Navigation Links (scrollable) */}
+      <div className="flex-grow overflow-y-auto space-y-2 pr-2"> {/* Scrollable area */}
+          <nav className="space-y-1">
+            <Link href="/dashboard" className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-50">
+              <FiGrid className="mr-3 h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
+              Canvas
+            </Link>
+            <Link href="/dashboard/notes" className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-50">
+              <FiFileText className="mr-3 h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
+              All Notes
+            </Link>
+             <Link href="/dashboard/files" className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-50">
+              <FiFolder className="mr-3 h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
+              All Files
+            </Link>
+        </nav>
+        {/* Consider adding Files List here if desired */}
+      </div>
+
+      {/* Footer Section: User Info, Logout (fixed bottom) */}
+      <div className="mt-auto flex-shrink-0 pt-4 border-t border-gray-200">
+         {user && (
+          <div className="mb-2 px-2 py-1 text-xs text-gray-500 bg-gray-100 rounded truncate">
+            Logged in as: {user.email}
+          </div>
+        )}
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        >
+          <FiLogOut className="mr-2 h-5 w-5" />
+          Logout
+        </button>
+      </div>
+
+      {/* Modals */}
+      {isCreateNoteModalOpen && (
+        <CreateNoteModal
+          isOpen={isCreateNoteModalOpen}
+          onClose={closeCreateNoteModal}
+          onCreate={handleCreateNoteSubmit}
+        />
+      )}
+
+      {isUploadFileModalOpen && (
+        <UploadFileModal
+          isOpen={isUploadFileModalOpen}
+          onClose={closeUploadFileModal}
+          onUpload={handleFileUploadSubmit}
+        />
+      )}
+
+      {isEditModalOpen && editingNote && (
+        <EditNoteModal
+          isOpen={isEditModalOpen}
+          onClose={closeEditModal}
+          note={editingNote}
+          onUpdate={handleUpdateNote}
+        />
+      )}
+    </div>
   );
 };
 

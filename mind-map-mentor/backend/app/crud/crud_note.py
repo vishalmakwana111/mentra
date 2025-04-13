@@ -1,13 +1,89 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
+import logging # Add logging
 
 from app.models.note import Note
 from app.models.graph_node import GraphNode
 from app.schemas.note import NoteCreate, NoteUpdate
 # Import graph CRUD and schema
 from app.crud import crud_graph
-from app.schemas.graph import GraphNodeCreate
+from app.schemas.graph import GraphNodeCreate, GraphEdgeCreate
 
+# Import AI modules
+from app.ai.embeddings import generate_embedding
+from app.ai.vectorstore import upsert_document, delete_document
+from app.core.config import settings # Import settings for threshold
+from app.ai.vectorstore import query_similar_notes # Need this for similarity search
+
+logger = logging.getLogger(__name__)
+
+
+def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: int):
+    """Finds similar notes and creates edges if they meet the threshold."""
+    if not new_note.content or new_note.graph_node_id is None:
+        logger.warning(f"Skipping edge creation for note {new_note.id}: Missing content or graph_node_id.")
+        return
+
+    logger.info(f"Finding similar notes for newly created note {new_note.id} for user {user_id}...")
+    try:
+        # Pass user_id to query_similar_notes for filtering
+        similar_results = query_similar_notes(query_text=new_note.content, user_id=user_id, top_k=6) 
+        
+        created_edge_count = 0
+        for result in similar_results:
+            score = result.get('score')
+            metadata = result.get('metadata', {})
+            similar_note_id = metadata.get('note_id')
+
+            # Validate result
+            if score is None or similar_note_id is None:
+                logger.warning(f"Skipping invalid search result: {result}")
+                continue
+            
+            # Don't link to self
+            if similar_note_id == new_note.id:
+                continue
+
+            # Check threshold
+            if score < settings.SIMILARITY_THRESHOLD:
+                logger.debug(f"Skipping note {similar_note_id} (score {score:.4f} < {settings.SIMILARITY_THRESHOLD})")
+                continue
+
+            # Get the graph_node_id for the similar note
+            similar_note = get_note(db, note_id=similar_note_id, user_id=user_id)
+            if not similar_note or similar_note.graph_node_id is None:
+                logger.warning(f"Could not find valid similar note or its graph node (Note ID: {similar_note_id})")
+                continue
+            
+            target_graph_node_id = similar_note.graph_node_id
+            source_graph_node_id = new_note.graph_node_id # From the new note
+
+            # TODO: Optional - Check if edge already exists between source_graph_node_id and target_graph_node_id
+
+            # Create the edge
+            try:
+                edge_schema = GraphEdgeCreate(
+                    source_node_id=source_graph_node_id,
+                    target_node_id=target_graph_node_id,
+                    label=f"related (score: {score:.2f})"
+                )
+                try:
+                    # Use the correct argument name 'edge' as defined in crud_graph.py
+                    created_edge = crud_graph.create_graph_edge(db=db, edge=edge_schema, user_id=user_id)
+                    if created_edge:
+                        logger.info(f"Created edge between graph nodes {source_graph_node_id} and {target_graph_node_id} (Similarity: {score:.2f})")
+                        created_edge_count += 1
+                    else:
+                        logger.warning(f"Edge between {source_graph_node_id} and {target_graph_node_id} might already exist or failed creation silently.")
+                except Exception as e:
+                    logger.error(f"Failed to create edge between {source_graph_node_id} and {target_graph_node_id}: {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"Failed to create edge between {source_graph_node_id} and {target_graph_node_id}: {e}", exc_info=True)
+
+        logger.info(f"Finished automatic edge creation for note {new_note.id}. Created {created_edge_count} new edge(s).")
+
+    except Exception as e:
+        logger.error(f"Error during automatic edge creation for note {new_note.id}: {e}")
 
 def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
     """Creates a new note and its corresponding graph node within a single transaction."""
@@ -15,20 +91,21 @@ def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
     position_x = note_data.get('position_x', 0.0)
     position_y = note_data.get('position_y', 0.0)
 
+    db_note = None # Initialize
+
     try:
-        # 1. Prepare Note object (without graph_node_id yet)
+        # 1. Prepare Note object
         db_note = Note(
             title=note_data.get('title'),
-            content=note_data.get('content'),
+            content=note_data.get('content'), # Content is now required by schema
             position_x=position_x,
             position_y=position_y,
             user_id=user_id,
         )
         
-        # 2. Prepare GraphNode object 
-        # (Data will be updated after flush to get Note ID)
+        # 2. Prepare GraphNode object
         graph_node = GraphNode(
-             user_id=user_id, # Ensure user_id is set
+             user_id=user_id,
              label=note_data.get('title', 'Untitled Note'),
              node_type='note',
              position={"x": position_x, "y": position_y},
@@ -45,22 +122,48 @@ def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
         # 5. Link Note to GraphNode and update GraphNode data
         db_note.graph_node_id = graph_node.id
         graph_node.data = {"original_note_id": db_note.id, "content": db_note.content}
-        # Mark them as modified within the session
         db.add(db_note)
-        db.add(graph_node) 
+        db.add(graph_node)
 
         # 6. Commit the transaction
         db.commit()
         
-        # Refresh instances to get updated state from DB
+        # 7. Refresh instances
         db.refresh(db_note)
         db.refresh(graph_node)
-        print(f"Successfully created Note {db_note.id} and linked GraphNode {graph_node.id}")
+        logger.info(f"Successfully created Note {db_note.id} and linked GraphNode {graph_node.id}")
         
     except Exception as e:
-        print(f"Error creating note/graph node: {e}")
+        logger.error(f"Error creating note/graph node in DB: {e}")
         db.rollback() # Rollback the transaction on error
         raise e # Re-raise the exception
+
+    # 8. Upsert document to vector store (AFTER successful DB commit)
+    if db_note and db_note.content: # Ensure note was created and content exists
+        try:
+            # vector = generate_embedding(db_note.content) # No longer generate embedding here
+            doc_id = f"note_{db_note.id}"
+            metadata = {
+                "note_id": db_note.id,
+                "user_id": user_id,
+                "title": db_note.title,
+                "type": "note"
+            }
+            # Pass text content directly to the new upsert function
+            upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
+            logger.info(f"Successfully submitted note {db_note.id} for embedding and upsert.")
+        except Exception as e:
+            # Log error but don't fail the whole operation as DB part succeeded
+            logger.error(f"Failed to submit note {db_note.id} for embedding/upsert: {e}")
+
+    # 9. Find similar notes and create edges (AFTER successful DB commit and upsert attempt)
+    if db_note:
+        try:
+            # Call the new helper function
+            _find_and_create_similar_note_edges(db=db, new_note=db_note, user_id=user_id)
+        except Exception as auto_edge_e:
+             # Log error but don't fail the main note creation response
+            logger.error(f"Failed during post-creation edge linking for note {db_note.id}: {auto_edge_e}")
 
     return db_note
 
@@ -85,7 +188,9 @@ def update_note(
     if not db_note:
         return None
 
-    update_data = note_in.model_dump(exclude_unset=True) # Get only provided fields
+    update_data = note_in.model_dump(exclude_unset=True) 
+    content_updated = 'content' in update_data # Check if content is part of the update
+
     for key, value in update_data.items():
         setattr(db_note, key, value)
         
@@ -134,9 +239,28 @@ def update_note(
         else:
              print(f"Skipping GraphNode update: Node {db_note.graph_node_id} not found or fetch error.")
 
+    # --- DB Commit ---
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+
+    # --- Vector Store Update (if content changed) ---
+    if content_updated and db_note.content:
+        try:
+            # vector = generate_embedding(db_note.content) # No longer generate embedding here
+            doc_id = f"note_{db_note.id}"
+            metadata = {
+                "note_id": db_note.id,
+                "user_id": user_id,
+                "title": db_note.title,
+                "type": "note"
+            }
+            # Pass text content directly to the new upsert function
+            upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
+            logger.info(f"Successfully submitted updated note {db_note.id} for embedding and upsert.")
+        except Exception as e:
+            logger.error(f"Failed to submit updated note {db_note.id} for embedding/upsert: {e}")
+
     return db_note
 
 def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
@@ -145,13 +269,22 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
     if not db_note:
         return None
 
-    # Store the linked graph_node_id before deleting the note
     linked_graph_node_id = db_note.graph_node_id
+    note_title_for_log = db_note.title # Store before delete
 
-    # Delete the note first
+    # --- Delete from Vector Store FIRST ---
+    doc_id = f"note_{note_id}"
+    try:
+        delete_document(doc_id=doc_id)
+        logger.info(f"Successfully deleted embedding for note {note_id} from vector store.")
+    except Exception as e:
+        # Log error, but continue with DB deletion
+        logger.error(f"Failed to delete embedding for note {note_id}: {e}")
+
+    # --- Delete from DB ---
     db.delete(db_note)
     db.commit()
-    print(f"Deleted Note {note_id}")
+    logger.info(f"Deleted Note {note_id} ('{note_title_for_log}') from DB.")
 
     # If a linked graph node existed, delete it too
     if linked_graph_node_id is not None:
@@ -165,7 +298,6 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
             print(f"Error deleting linked GraphNode {linked_graph_node_id} for Note {note_id}: {e}")
             # Log this inconsistency
             
-    # db_note object is detached after commit, but we can return its state before deletion
-    # Or simply return None or a success indicator if the object state isn't needed
-    return db_note # Returning the object might be misleading as it's deleted
+    # Consider returning just the ID or success boolean
+    return db_note # Returning the object is potentially misleading
     # Consider returning the ID or None: return note_id or return None 
