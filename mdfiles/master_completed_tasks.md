@@ -2,6 +2,36 @@
 
 This file consolidates all completed tasks marked with `[X]` from the various task files in the `mdfiles` directory.
 
+## From `rag_implementation_tasks.md`:
+
+- [X] **Add Detailed RAG Logging:**
+  - [X] Implement DEBUG logs in `rag.py` to track raw retrieved document structure
+  - [X] Add logs for formatted context string sent to the LLM
+  - [X] Add logs for exact, fully formatted prompt before LLM call
+  - [X] Add logs for final LLM-generated answer
+  - [X] Log complete payload being sent back to frontend
+- [X] **Enable DEBUG Logging:**
+  - [X] Change logging level in `main.py` from `INFO` to `DEBUG`
+- [X] **Fix RAG Context Issue:**
+  - [X] Diagnose empty context using logs
+  - [X] Fix `format_docs` to extract text from correct document field
+  - [X] Modify to use only raw note text as context without source identifiers
+- [X] **Fix Vector Store Retrieval:**
+  - [X] Modify `query_similar_notes` in `vectorstore.py` to include `page_content`
+  - [X] Ensure metadata properly includes note information
+- [X] **Refactor RAG Chain:**
+  - [X] Update LCEL chain to use standard patterns (`itemgetter`, `RunnableLambda`)
+  - [X] Implement `ChatPromptTemplate` correctly
+  - [X] Improve prompt instructions for better RAG performance
+- [X] **Add Vector Store Logging:**
+  - [X] Add DEBUG logs to `upsert_document` in `vectorstore.py`
+  - [X] Verify Pinecone upsert process with new logs
+- [X] **Fix Source Extraction:**
+  - [X] Correctly extract `note_id` and `title` from metadata in RAG response
+- [X] **Fix Frontend Highlighting:**
+  - [X] Update `searchStore.ts` to map database `note_id` to graph node ID
+  - [X] Implement correct node highlighting on the graph
+
 ## From `frontend_auto_edge_sync_tasks.md`:
 
 - [X] **Implement Frontend Refetch After Note Creation:**
