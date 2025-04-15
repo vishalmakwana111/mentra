@@ -8,7 +8,7 @@ import {
     NoteNodeData, 
     FileNodeData 
 } from '@/types';
-import { fetchGraphNodes, fetchGraphEdges } from '@/services/api'; 
+import { fetchGraphNodes, fetchGraphEdges, updateNote, updateNotePosition, updateFilePosition, createGraphEdge } from '@/services/api'; 
 
 // Helper function for default positioning (simple random offset)
 const getRandomPosition = (): XYPosition => ({
@@ -30,6 +30,8 @@ interface GraphState {
   fetchGraphData: () => Promise<void>; // Renamed fetch action
   addNoteNode: (newNote: Note) => void; // Renamed and adapted
   updateNodeData: (nodeId: string, dataUpdate: Partial<GraphNodeData>) => void; // More generic update
+  updateNoteContent: (originalNoteId: number, newContent: string) => Promise<void>; // <-- Add new action signature
+  updateNodePosition: (nodeId: string, position: XYPosition) => Promise<void>; // <-- Add action for position updates
   addFileNode: (newFile: ApiFile) => void; // Action to add file node
   removeFileNode: (fileId: number) => void; // Action to remove file node
   addEdge: (newEdge: GraphEdge) => void; // Renamed
@@ -185,16 +187,97 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     console.log('GraphStore: Added Note Node:', newNode);
   },
 
-  // Update node data (position is handled via this too now)
+  // Update LOCAL node data state
   updateNodeData: (nodeId: string, dataUpdate: Partial<GraphNodeData>) => {
     set((state) => ({
       nodes: state.nodes.map((node) =>
         node.id === nodeId
-          ? { ...node, data: { ...node.data, ...dataUpdate } }
+          ? { ...node, data: { ...node.data, ...dataUpdate, updated_at: new Date().toISOString() } } // Update updated_at locally
           : node
       ),
     }));
-    console.log(`GraphStore: Updated Node Data for ${nodeId}:`, dataUpdate);
+    console.log(`GraphStore: Updated LOCAL Node Data for ${nodeId}:`, dataUpdate);
+  },
+  
+  // Update note content (API call + local state)
+  updateNoteContent: async (originalNoteId: number, newContent: string) => {
+    console.log(`GraphStore: Attempting to update content for original note ID: ${originalNoteId}`);
+    try {
+      // 1. Call API to update the backend
+      const updatedNote = await updateNote(originalNoteId, { content: newContent });
+      console.log(`GraphStore: Backend update successful for note ${originalNoteId}`, updatedNote);
+
+      // 2. Update local state using existing updateNodeData
+      const graphNodeId = updatedNote.graph_node_id;
+      if (graphNodeId) {
+          const reactFlowNodeId = getNodeId('note', graphNodeId);
+          if (reactFlowNodeId) {
+              // Update the content and updated_at timestamp in the local node data
+              get().updateNodeData(reactFlowNodeId, { 
+                  content: updatedNote.content, 
+                  updated_at: updatedNote.updated_at 
+              });
+          } else {
+             console.error(`GraphStore: Could not generate React Flow node ID for updated note graph_node_id: ${graphNodeId}`);
+          }
+      } else {
+        console.error(`GraphStore: Updated note from API is missing graph_node_id:`, updatedNote);
+      }
+
+    } catch (error) {
+      console.error(`GraphStore: Failed to update content for note ${originalNoteId}:`, error);
+      // Re-throw the error so the calling component knows it failed
+      throw error;
+    }
+  },
+
+  // Add updateNodePosition action if it doesn't exist
+  updateNodePosition: async (nodeId: string, position: XYPosition) => {
+      // Determine type and original ID from nodeId
+      const parts = nodeId.split('-');
+      const type = parts[0] as 'note' | 'file';
+      const graphNodeId = parseInt(parts[1], 10);
+      
+      if (!type || isNaN(graphNodeId)) {
+          console.error(`GraphStore: Invalid node ID format for position update: ${nodeId}`);
+          return;
+      }
+
+      const nodeData = get().nodes.find(n => n.id === nodeId)?.data;
+      if (!nodeData) {
+          console.error(`GraphStore: Could not find node data for ID: ${nodeId}`);
+          return;
+      }
+      
+      const originalId = type === 'note' ? (nodeData as NoteNodeData).original_note_id : (nodeData as FileNodeData).original_file_id;
+      
+      if (originalId === undefined) {
+          console.error(`GraphStore: Could not find original ID in node data for ID: ${nodeId}`);
+          return;
+      }
+      
+      console.log(`GraphStore: Attempting position update for ${type} (Original ID: ${originalId}, GraphNode ID: ${graphNodeId}) to`, position);
+
+      try {
+          // Call appropriate API based on type
+          if (type === 'note') {
+              await updateNotePosition(originalId, position);
+          } else if (type === 'file') {
+              await updateFilePosition(originalId, position);
+          }
+          // Update local state immediately for responsiveness
+          set(state => ({
+              nodes: state.nodes.map(node => 
+                  node.id === nodeId
+                      ? { ...node, position: position, data: { ...node.data, position_x: position.x, position_y: position.y } }
+                      : node
+              )
+          }));
+          console.log(`GraphStore: Position update successful for ${nodeId}`);
+      } catch (error) {
+          console.error(`GraphStore: Failed to update position for ${nodeId}:`, error);
+          // Consider reverting local state change or showing error
+      }
   },
 
   // Adds a new file node

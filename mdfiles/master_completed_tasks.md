@@ -2,6 +2,15 @@
 
 This file consolidates all completed tasks marked with `[X]` from the various task files in the `mdfiles` directory.
 
+## From `inline_note_editing_tasks.md`:
+
+- [X] **Implement Inline Note Content Editing:**
+    - [X] Modify `NoteNode.tsx` to add editing state and double-click handler.
+    - [X] Implement conditional rendering of text display or textarea in `NoteNode.tsx`.
+    - [X] Handle saving edited content on blur in `NoteNode.tsx`.
+    - [X] Verify backend, API service, and store actions for content updates.
+    - [X] Test and refine styling and UX for inline editing.
+
 ## From `rag_implementation_tasks.md`:
 
 - [X] **Add Detailed RAG Logging:**
