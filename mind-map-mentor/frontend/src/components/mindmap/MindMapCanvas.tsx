@@ -366,6 +366,51 @@ const MindMapCanvas: React.FC = () => {
       return `${type}-${graphNodeId}`;
   };
 
+  // Helper function to determine edge style based on label or similarity score
+  const getEdgeStyle = (edge: Edge) => {
+    const similarityScore = edge.data?.similarity_score as number | undefined;
+    const label = edge.label as string | undefined;
+    
+    // If we have a similarity score, use that for styling
+    if (typeof similarityScore === 'number') {
+      if (similarityScore >= 0.9) {
+        return { strokeWidth: 4, stroke: '#0a3' }; // Strongly Related (thick green)
+      } else if (similarityScore >= 0.8) {
+        return { strokeWidth: 3.5, stroke: '#3a4' }; // Highly Related (medium thick green)
+      } else if (similarityScore >= 0.7) {
+        return { strokeWidth: 3, stroke: '#777' }; // Related (medium neutral)
+      } else if (similarityScore >= 0.6) {
+        return { strokeWidth: 2.5, stroke: '#888' }; // Moderately Related (thin neutral)
+      } else if (similarityScore >= 0.5) {
+        return { strokeWidth: 2, stroke: '#aaa' }; // Weakly Related (thinnest neutral)
+      }
+    }
+    
+    // If we don't have a similarity score, use the label for styling
+    if (label) {
+      if (label.includes('Strongly Related')) {
+        return { strokeWidth: 4, stroke: '#0a3' };
+      } else if (label.includes('Highly Related')) {
+        return { strokeWidth: 3.5, stroke: '#3a4' };
+      } else if (label.includes('Related') && !label.includes('Moderately') && !label.includes('Weakly')) {
+        return { strokeWidth: 3, stroke: '#777' };
+      } else if (label.includes('Moderately Related')) {
+        return { strokeWidth: 2.5, stroke: '#888' };
+      } else if (label.includes('Weakly Related')) {
+        return { strokeWidth: 2, stroke: '#aaa' };
+      }
+    }
+    
+    // Default style for edges without score or recognized label
+    return { strokeWidth: 1.5, stroke: '#bbb' };
+  };
+
+  // Apply edge styling to all edges
+  const styledEdges = edges.map(edge => ({
+    ...edge,
+    style: getEdgeStyle(edge)
+  }));
+
   // Display loading or error state
   if (isLoading) {
     return <div className="flex items-center justify-center h-full">Loading map data...</div>;
@@ -379,7 +424,7 @@ const MindMapCanvas: React.FC = () => {
     <div style={{ height: '100%', width: '100%' }}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={styledEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
@@ -411,7 +456,7 @@ const MindMapCanvas: React.FC = () => {
       
       {/* Note Edit Modal */}
       {isNoteModalOpen && editingNoteData && editingNoteData.type === 'note' && (
-          <NoteEditModal
+        <NoteEditModal
               isOpen={isNoteModalOpen}
               onClose={handleNoteModalClose}
               noteData={editingNoteData}
@@ -426,7 +471,7 @@ const MindMapCanvas: React.FC = () => {
               onEdit={handleMenuEdit} 
               onDelete={handleMenuDelete}
               onClose={() => setMenuEdgeId(null)} // Simple close
-          />
+        />
       )}
     </div>
   );

@@ -231,8 +231,19 @@ def create_graph_edge(db: Session, edge: GraphEdgeCreate, user_id: int) -> Optio
         print(f"Target node {edge.target_node_id} not found or does not belong to user {user_id}")
         return None
     
+    # Convert the input model to a dict for creating the DB object
+    edge_data = edge.model_dump()
+    
+    # If a label is provided but relationship_type is not, use label as relationship_type
+    if edge_data.get('label') and not edge_data.get('relationship_type'):
+        edge_data['relationship_type'] = edge_data['label']
+    
+    # Remove the label field since it's not in the database model
+    if 'label' in edge_data:
+        del edge_data['label']
+    
     print(f"[create_graph_edge] Both nodes found. Creating edge...") # DEBUG LOG
-    db_edge = GraphEdge(**edge.model_dump(), user_id=user_id)
+    db_edge = GraphEdge(**edge_data, user_id=user_id)
     db.add(db_edge)
     db.commit() # Commit here is fine as it's the final step
     db.refresh(db_edge)
@@ -258,6 +269,21 @@ def update_graph_edge(
              print(f"New target node {update_data['target_node_id']} not found or does not belong to user {user_id}")
              return None # Or raise?
 
+    # If label is provided but relationship_type is not, use label for relationship_type
+    if 'label' in update_data and 'relationship_type' not in update_data:
+        update_data['relationship_type'] = update_data['label']
+    
+    # Remove label as it's not in the database model
+    if 'label' in update_data:
+        del update_data['label']
+
+    # Special handling for JSON data field
+    if 'data' in update_data:
+        db_edge.data = update_data['data']
+        flag_modified(db_edge, "data")  # Mark as modified for SQLAlchemy
+        del update_data['data']  # Remove from update_data as we've handled it
+
+    # Update other fields
     for key, value in update_data.items():
         setattr(db_edge, key, value)
 

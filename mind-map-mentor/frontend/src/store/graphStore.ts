@@ -133,11 +133,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               return null; // Skip this edge
           }
 
+          // Get the similarity score from data if available
+          const similarityScore = edge.data?.similarity_score;
+          
+          // Create edge data with similarity score if available
+          const edgeData = {
+              similarity_score: similarityScore
+          };
+
           return {
               id: `edge-${edge.id}`,
               source: sourceNodeIdStr,
               target: targetNodeIdStr,
-              label: edge.relationship_type,
+              label: edge.label || edge.relationship_type, // Prefer label if available
+              data: edgeData, // Add edge data
           };
       }).filter((edge): edge is Edge => edge !== null); 
 
@@ -350,7 +359,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           id: `edge-${newEdge.id}`,
           source: sourceNodeIdStr,
           target: targetNodeIdStr,
-          label: newEdge.relationship_type,
+          label: newEdge.label || newEdge.relationship_type,
+          data: {
+            similarity_score: newEdge.data?.similarity_score
+          }
       };
 
     set((state) => ({

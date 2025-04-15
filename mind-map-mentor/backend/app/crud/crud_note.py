@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified # Import flag_modified
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Union
 import logging # Add logging
 
 from app.models.note import Note
@@ -64,16 +64,20 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
 
             # Create the edge
             try:
+                # Get relationship label based on score
+                relationship_label = get_relationship_label_from_score(score)
+                
                 edge_schema = GraphEdgeCreate(
                     source_node_id=source_graph_node_id,
                     target_node_id=target_graph_node_id,
-                    label=f"related (score: {score:.2f})"
+                    label=relationship_label,
+                    data={'similarity_score': score}  # Store the raw score for future use
                 )
                 try:
                     # Use the correct argument name 'edge' as defined in crud_graph.py
                     created_edge = crud_graph.create_graph_edge(db=db, edge=edge_schema, user_id=user_id)
                     if created_edge:
-                        logger.info(f"Created edge between graph nodes {source_graph_node_id} and {target_graph_node_id} (Similarity: {score:.2f})")
+                        logger.info(f"Created edge between graph nodes {source_graph_node_id} and {target_graph_node_id} (Label: {relationship_label}, Score: {score:.2f})")
                         created_edge_count += 1
                     else:
                         logger.warning(f"Edge between {source_graph_node_id} and {target_graph_node_id} might already exist or failed creation silently.")
@@ -256,7 +260,7 @@ async def update_note(
         position_updated = False
 
         # Apply standard field updates to Note model
-    for key, value in update_data.items():
+        for key, value in update_data.items():
             # Skip 'tags' here, handle separately below for GraphNode
             if key == 'tags':
                 continue 
@@ -276,7 +280,7 @@ async def update_note(
                  position_updated = True
             # Apply other direct updates to Note model
             elif hasattr(db_note, key):
-        setattr(db_note, key, value)
+                 setattr(db_note, key, value)
         
         # Update GraphNode related fields if graph_node exists
         if graph_node:
@@ -427,3 +431,30 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
 # either in the API endpoint handlers or by modifying CRUD functions like 
 # get_graph_node to return populated Pydantic models instead of SQLAlchemy models.
 # For this task, we assume the storage part is sufficient, and population is handled later. 
+
+
+def get_relationship_label_from_score(score: float) -> str:
+    """
+    Maps a similarity score to a descriptive relationship label.
+    
+    Args:
+        score: Float similarity score from 0.0 to 1.0
+        
+    Returns:
+        String label describing the relationship strength
+    """
+    # Ensure score is within bounds
+    score = max(0.0, min(1.0, score))
+    
+    if score >= 0.9:
+        return "Strongly Related"
+    elif score >= 0.8:
+        return "Highly Related"
+    elif score >= 0.7:
+        return "Related"
+    elif score >= 0.6:
+        return "Moderately Related"
+    elif score >= 0.5:
+        return "Weakly Related"
+    else:
+        return "Weakly Related"  # Default for scores below our threshold 

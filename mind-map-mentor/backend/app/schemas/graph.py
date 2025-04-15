@@ -103,4 +103,8 @@ class GraphEdgeInDBBase(GraphEdgeBase):
 
 # Properties to return to client
 class GraphEdge(GraphEdgeInDBBase):
-    pass 
+    # Add computed field for label (if needed for frontend compatibility)
+    @computed_field
+    @property
+    def label(self) -> Optional[str]:
+        return self.relationship_type  # Use relationship_type as the label 
