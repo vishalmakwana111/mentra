@@ -450,4 +450,46 @@ This file consolidates all completed tasks marked with `[X]` from the various ta
 
 ## From `all_tasks.md` & `plan.md`:
 
-(Note: These were high-level planning files, individual completed items are likely captured in the more specific task files above). 
+(Note: These were high-level planning files, individual completed items are likely captured in the more specific task files above).
+
+## From `fixed_note_tags_tasks.md`:
+
+- [X] **Verify/Update Note Update Schema:**
+    - [X] In `schemas/note.py`, ensure the `NoteUpdate` schema includes `tags: List[str] | None = None`.
+- [X] **Verify/Update Note CRUD Function:**
+    - [X] In `crud/crud_note.py`, review the `update_note` function.
+    - [X] Ensure it correctly handles the `tags` field if present in the input.
+    - [X] Ensure manual tags overwrite existing tags.
+    - [X] Confirm manual tags update happens before AI regeneration.
+- [X] **Verify Note Update API Endpoint:**
+    - [X] In `endpoints/notes.py`, confirm the `PUT /notes/{note_id}` endpoint uses `NoteUpdate` schema.
+    - [X] Confirm the endpoint returns the updated `Note` object.
+- [X] **Design Tag Editing UI/UX:**
+    - [X] Choose Interaction Method: Option B (Inline editing in NoteNode.tsx).
+- [X] **Implement Tag Editing Component:**
+    - [X] Modify `NoteNode.tsx`.
+    - [X] Add input element for comma-separated tags.
+    - [X] Add local state for tag editing.
+    - [X] Initialize local state on edit start.
+    - [X] Handle user input and parse tags.
+- [X] **Implement Save Logic:**
+    - [X] Define Save Trigger (`onBlur`, Enter key).
+    - [X] Create `handleSaveTags` function.
+    - [X] Get `original_note_id` and edited tags.
+    - [X] Compare changes.
+    - [X] Call `updateNote` API service if tags changed.
+    - [X] Close/Reset UI after save attempt.
+- [X] **Update Frontend Store:**
+    - [X] Ensure store updates tags after successful API call (Manual call via `updateNodeData`).
+    - [X] Call store update in `handleSaveTags`.
+- [X] **Tag Display:**
+    - [X] Verify display logic in `NoteNode.tsx` shows updated tags.
+- [X] **User Feedback:**
+    - [X] Import `toast`.
+    - [X] Add success/error toasts in `handleSaveTags`.
+- [X] **Testing:**
+    - [X] Test Add.
+    - [X] Test Edit.
+    - [X] Test Remove All.
+    - [X] Test Interaction with AI Tags.
+    - [X] Test Error Handling. 

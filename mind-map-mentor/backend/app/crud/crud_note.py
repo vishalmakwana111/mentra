@@ -226,7 +226,7 @@ def get_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
 async def update_note(
     db: Session, note_id: int, note_in: NoteUpdate, user_id: int
 ) -> Optional[Note]:
-    """Updates a specific note, potentially regenerating tags and updating vector store."""
+    """Updates a specific note, handling manual tag updates and conditional AI regeneration."""
     db_note = get_note(db, note_id=note_id, user_id=user_id)
     if not db_note:
         logger.warning(f"Update failed: Note {note_id} not found for user {user_id}.")
@@ -237,122 +237,140 @@ async def update_note(
         graph_node = crud_graph.get_graph_node(db, node_id=db_note.graph_node_id, user_id=user_id)
         if not graph_node:
              logger.warning(f"Note {note_id} has graph_node_id {db_note.graph_node_id}, but GraphNode not found.")
-             # Proceed with note update, but tag/vector updates might fail
+             # Continue with note update, but tag updates won't happen
 
     update_data = note_in.model_dump(exclude_unset=True) 
-    content_updated = False
-    new_tags = [] # Initialize tags list
+    
+    # --- Check flags before entering transaction ---
+    content_updated = (
+        'content' in update_data and 
+        update_data['content'] != db_note.content
+    )
+    # Check if manual tags were provided in the input
+    manual_tags_provided = 'tags' in update_data
+    manual_tags = update_data.get('tags') if manual_tags_provided else None
 
+    # --- Main Update Transaction --- 
     try:
-        # --- Apply Updates to Note and GraphNode (within one transaction) ---
         logger.info(f"Updating note {note_id}...")
         position_updated = False
 
-        # Apply standard field updates to Note
+        # Apply standard field updates to Note model
         for key, value in update_data.items():
+            # Skip 'tags' here, handle separately below for GraphNode
+            if key == 'tags':
+                continue 
+                
             if key == 'content':
-                if value != db_note.content:
-                    logger.info(f"Note {note_id} content is being updated.")
-                    setattr(db_note, key, value)
-                    content_updated = True
-                    # Also update graph node's data if exists
-                    if graph_node and graph_node.data:
-                        graph_node.data['content'] = value
-                        flag_modified(graph_node, "data")
-                continue # Handle content update separately below if needed for graph node
-            
-            # Handle position updates (simplified, assuming x/y are passed)
-            if key == 'position_x' and value != db_note.position_x:
+                # Already checked content_updated flag, just apply
+                setattr(db_note, key, value)
+                # Also update graph node's data cache if exists
+                if graph_node and graph_node.data:
+                    graph_node.data['content'] = value
+                    flag_modified(graph_node, "data")
+            elif key == 'position_x' and value != db_note.position_x:
                 setattr(db_note, key, value)
                 position_updated = True
             elif key == 'position_y' and value != db_note.position_y:
                  setattr(db_note, key, value)
                  position_updated = True
-            # Apply other direct updates
+            # Apply other direct updates to Note model
             elif hasattr(db_note, key):
                 setattr(db_note, key, value)
 
-        # Update GraphNode position if changed
-        if position_updated and graph_node:
-            new_pos = {"x": db_note.position_x, "y": db_note.position_y}
-            if graph_node.position != new_pos:
-                graph_node.position = new_pos
-                flag_modified(graph_node, "position")
-                logger.info(f"Updating GraphNode {graph_node.id} position to {new_pos}")
+        # Update GraphNode related fields if graph_node exists
+        if graph_node:
+            # Update GraphNode position if changed
+            if position_updated:
+                new_pos = {"x": db_note.position_x, "y": db_note.position_y}
+                if graph_node.position != new_pos:
+                    graph_node.position = new_pos
+                    flag_modified(graph_node, "position")
+                    logger.info(f"Updating GraphNode {graph_node.id} position to {new_pos}")
 
-        # Update GraphNode label if title changed
-        if 'title' in update_data and graph_node and update_data['title'] != graph_node.label:
-            graph_node.label = update_data['title']
-            logger.info(f"Updating GraphNode {graph_node.id} label to {graph_node.label}")
+            # Update GraphNode label if title changed
+            if 'title' in update_data and update_data['title'] != graph_node.label:
+                graph_node.label = update_data['title']
+                logger.info(f"Updating GraphNode {graph_node.id} label to {graph_node.label}")
+            
+            # --- Task 2: Handle Manual Tags --- 
+            if manual_tags_provided:
+                logger.info(f"Manually updating tags for GraphNode {graph_node.id} to: {manual_tags}")
+                current_data = graph_node.data if graph_node.data else {}
+                current_data['tags'] = manual_tags # Overwrite existing tags
+                graph_node.data = current_data
+                flag_modified(graph_node, "data")
+                # No need to store in `new_tags` variable, applied directly
         
-        # Add note and potentially modified graph_node to session
+        # Add potentially modified note and graph_node to session
         db.add(db_note)
         if graph_node:
             db.add(graph_node)
 
-        # Commit the primary updates (content, title, position etc.)
+        # Commit the primary updates (content, title, position, manual tags etc.)
         db.commit()
         
         # Refresh instances
         db.refresh(db_note)
         if graph_node:
             db.refresh(graph_node)
-        logger.info(f"Successfully updated Note {db_note.id} and potentially linked GraphNode {graph_node.id if graph_node else 'N/A'}.")
+        logger.info(f"Successfully committed main updates for Note {db_note.id} and GraphNode {graph_node.id if graph_node else 'N/A'}.")
         
-        # --- Task 3.5: Regenerate Tags if Content Changed (AFTER successful update commit) ---
-        if content_updated and db_note.content:
-            try:
-                logger.info(f"Content updated for note {note_id}, attempting to regenerate tags...")
-                new_tags = await suggest_tags_for_content(db_note.content)
-                logger.info(f"Suggested new tags for note {note_id}: {new_tags}")
-                
-                # --- Task 3.6: Store New Tags (Separate transaction) ---
-                if graph_node: # Ensure we have a graph node to update
-                    try:
-                        current_data = graph_node.data if graph_node.data else {}
-                        current_data['tags'] = new_tags
-                        graph_node.data = current_data
-                        flag_modified(graph_node, "data")
-                        
-                        db.add(graph_node)
-                        db.commit()
-                        db.refresh(graph_node)
-                        logger.info(f"Successfully stored updated tags {new_tags} for GraphNode {graph_node.id}")
-                    except Exception as store_tag_error:
-                        logger.error(f"Failed to store updated tags for GraphNode {graph_node.id}: {store_tag_error}", exc_info=True)
-                        db.rollback() # Rollback only tag storage failure
-                else:
-                    logger.warning(f"Content updated for note {note_id}, but no linked graph node found to store tags.")
-
-            except Exception as tag_error:
-                logger.error(f"Failed to generate tags for updated note {note_id}: {tag_error}", exc_info=True)
-                # Continue without updating tags if generation fails
-
     except Exception as e:
         logger.error(f"Error during note update main transaction: {e}", exc_info=True)
         db.rollback()
         return None # Return None if the main update fails
 
-    # --- Post-Update Async Tasks (Embedding) ---
+    # --- Conditional AI Tag Generation (Post-Commit) ---
+    # Only run if content changed AND manual tags were NOT provided in this request
+    ai_generated_tags = [] # Initialize for vector metadata
+    if content_updated and not manual_tags_provided:
+        logger.info(f"Content updated for note {note_id} and no manual tags provided. Attempting AI tag regeneration...")
+        try:
+            ai_generated_tags = await suggest_tags_for_content(db_note.content)
+            logger.info(f"AI suggested tags for note {note_id}: {ai_generated_tags}")
+            
+            # Store AI Tags (Separate transaction)
+            if graph_node: # Ensure we have a graph node to update
+                try:
+                    current_data = graph_node.data if graph_node.data else {}
+                    current_data['tags'] = ai_generated_tags
+                    graph_node.data = current_data
+                    flag_modified(graph_node, "data")
+                    
+                    db.add(graph_node)
+                    db.commit()
+                    db.refresh(graph_node)
+                    logger.info(f"Successfully stored AI generated tags {ai_generated_tags} for GraphNode {graph_node.id}")
+                except Exception as store_tag_error:
+                    logger.error(f"Failed to store AI generated tags for GraphNode {graph_node.id}: {store_tag_error}", exc_info=True)
+                    db.rollback() # Rollback only tag storage failure
+            else:
+                logger.warning(f"AI tags generated for note {note_id}, but no linked graph node found to store them.")
+
+        except Exception as tag_error:
+            logger.error(f"Failed to generate AI tags for updated note {note_id}: {tag_error}", exc_info=True)
+            # Continue without updating tags if AI generation fails
+
+    # --- Post-Update Vector Store Update (if content changed) ---
     if content_updated and db_note and db_note.content:
         try:
             doc_id = f"note_{db_note.id}"
+            # Determine which tags to use for metadata (prefer manual if provided, else AI)
+            tags_for_metadata = manual_tags if manual_tags_provided else ai_generated_tags
             metadata = {
                 "note_id": db_note.id,
                 "user_id": user_id,
                 "title": db_note.title,
                 "type": "note",
-                # Potential place to add tags to metadata:
-                # "tags": new_tags # Use the tags generated in this update
+                "tags": tags_for_metadata # Add tags to metadata
             }
             upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
-            logger.info(f"Successfully submitted updated note {db_note.id} for embedding and upsert.")
+            logger.info(f"Successfully submitted updated note {db_note.id} for embedding and upsert with tags: {tags_for_metadata}.")
         except Exception as e:
             logger.error(f"Failed to submit updated note {db_note.id} for embedding/upsert: {e}", exc_info=True)
 
-    # Optional: Re-evaluate edges based on new content? (Not implemented here)
-
-    # Refresh the note one last time before returning to ensure it reflects any tag-related refreshes
+    # Refresh the note one last time before returning
     if db_note:
         db.refresh(db_note)
     return db_note

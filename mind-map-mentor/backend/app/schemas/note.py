@@ -19,6 +19,7 @@ class NoteCreate(NoteBase):
 # Properties to receive via API on update
 class NoteUpdate(NoteBase):
     # All fields are optional on update
+    tags: Optional[List[str]] = None
     pass
 
 # Properties shared by models stored in DB
