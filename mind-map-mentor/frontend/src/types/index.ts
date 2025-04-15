@@ -101,11 +101,8 @@ export interface BackendGraphEdge {
     source_node_id: number;
     target_node_id: number;
     relationship_type: string | null;
-    label: string | null; // Matches the relationship_type but used by frontend
-    data: {
-        similarity_score?: number;
-        [key: string]: any;
-    } | null;
+    label: string | null;
+    data: { similarity_score?: number; [key: string]: any } | null;
     created_at: string;
     updated_at: string | null;
 }
@@ -164,11 +161,9 @@ export interface GraphEdge {
   user_id: number;
   source_node_id: number;
   target_node_id: number;
+  relationship_type: string | null;
   label: string | null;
-  data: {
-    similarity_score?: number;
-    [key: string]: any;
-  } | null;
+  data: { similarity_score?: number; [key: string]: any } | null;
   created_at: string;
   updated_at: string | null;
 }

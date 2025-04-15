@@ -56,6 +56,19 @@ import toast from 'react-hot-toast';
 // Import Zustand Store
 import { useGraphStore } from '@/store/graphStore';
 
+// --- Constants for Edge Styling ---
+const edgeStyles = {
+  "Strongly Related": { stroke: '#2E7D32', strokeWidth: 3, animated: true }, // Darker Green, thick, animated
+  "Highly Related":   { stroke: '#1976D2', strokeWidth: 2.5 }, // Standard Blue, medium-thick
+  "Related":          { stroke: '#374151', strokeWidth: 2 }, // Dark Gray/Black, standard thick
+  "Moderately Related":{ stroke: '#9CA3AF', strokeWidth: 1.5, style: { strokeDasharray: '5 5' } }, // Gray, thin, dashed
+  "Weakly Related":   { stroke: '#D1D5DB', strokeWidth: 1, style: { strokeDasharray: '10 10' } }, // Light Gray, very thin, long dash
+  "Default":          { stroke: '#6B7280', strokeWidth: 1.5 } // Default for manual or unknown
+};
+
+type EdgeStyleKey = keyof typeof edgeStyles;
+// --- End Constants ---
+
 const MindMapCanvas: React.FC = () => {
   // Read state and actions directly from Zustand store
   const {
@@ -220,6 +233,8 @@ const MindMapCanvas: React.FC = () => {
 
   // Update double click handler
   const handleNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node<GraphNodeData>) => {
+    // Comment out or remove the logic to open the modal
+    /*
     if (node.data.type === 'note') {
         setEditingNoteData(node.data);
         setIsNoteModalOpen(true);
@@ -227,6 +242,8 @@ const MindMapCanvas: React.FC = () => {
         // Handle double click for file nodes if needed (e.g., open preview?)
         console.log('Double clicked file node:', node.data.label);
     }
+    */
+    console.log('Node double-clicked (modal opening disabled):', node);
   }, []);
 
   // Edge Interaction Handlers
@@ -366,50 +383,28 @@ const MindMapCanvas: React.FC = () => {
       return `${type}-${graphNodeId}`;
   };
 
-  // Helper function to determine edge style based on label or similarity score
-  const getEdgeStyle = (edge: Edge) => {
-    const similarityScore = edge.data?.similarity_score as number | undefined;
-    const label = edge.label as string | undefined;
+  // --- Task 8: Apply styles to edges before rendering (Moved before conditional returns) ---
+  const styledEdges = useMemo(() => edges.map(edge => {
+    const labelKey = edge.label as EdgeStyleKey;
+    const styleProps = edgeStyles[labelKey] || edgeStyles["Default"];
     
-    // If we have a similarity score, use that for styling
-    if (typeof similarityScore === 'number') {
-      if (similarityScore >= 0.9) {
-        return { strokeWidth: 4, stroke: '#0a3' }; // Strongly Related (thick green)
-      } else if (similarityScore >= 0.8) {
-        return { strokeWidth: 3.5, stroke: '#3a4' }; // Highly Related (medium thick green)
-      } else if (similarityScore >= 0.7) {
-        return { strokeWidth: 3, stroke: '#777' }; // Related (medium neutral)
-      } else if (similarityScore >= 0.6) {
-        return { strokeWidth: 2.5, stroke: '#888' }; // Moderately Related (thin neutral)
-      } else if (similarityScore >= 0.5) {
-        return { strokeWidth: 2, stroke: '#aaa' }; // Weakly Related (thinnest neutral)
-      }
-    }
-    
-    // If we don't have a similarity score, use the label for styling
-    if (label) {
-      if (label.includes('Strongly Related')) {
-        return { strokeWidth: 4, stroke: '#0a3' };
-      } else if (label.includes('Highly Related')) {
-        return { strokeWidth: 3.5, stroke: '#3a4' };
-      } else if (label.includes('Related') && !label.includes('Moderately') && !label.includes('Weakly')) {
-        return { strokeWidth: 3, stroke: '#777' };
-      } else if (label.includes('Moderately Related')) {
-        return { strokeWidth: 2.5, stroke: '#888' };
-      } else if (label.includes('Weakly Related')) {
-        return { strokeWidth: 2, stroke: '#aaa' };
-      }
-    }
-    
-    // Default style for edges without score or recognized label
-    return { strokeWidth: 1.5, stroke: '#bbb' };
-  };
+    // Ensure base edge properties are preserved
+    const baseEdge = { ...edge };
 
-  // Apply edge styling to all edges
-  const styledEdges = edges.map(edge => ({
-    ...edge,
-    style: getEdgeStyle(edge)
-  }));
+    // Merge style properties. Need to handle nested `style` object carefully.
+    if (styleProps.style) {
+      baseEdge.style = { ...(baseEdge.style || {}), ...styleProps.style };
+    }
+    // Merge top-level style properties (like stroke, strokeWidth, animated)
+    const topLevelStyleProps = { ...styleProps };
+    delete topLevelStyleProps.style; // Remove nested style from direct merge
+    
+    return {
+      ...baseEdge,
+      ...topLevelStyleProps // Apply stroke, strokeWidth, animated etc.
+    };
+  }), [edges]);
+  // --- End Task 8 ---
 
   // Display loading or error state
   if (isLoading) {
@@ -456,7 +451,7 @@ const MindMapCanvas: React.FC = () => {
       
       {/* Note Edit Modal */}
       {isNoteModalOpen && editingNoteData && editingNoteData.type === 'note' && (
-        <NoteEditModal
+          <NoteEditModal
               isOpen={isNoteModalOpen}
               onClose={handleNoteModalClose}
               noteData={editingNoteData}
@@ -471,7 +466,7 @@ const MindMapCanvas: React.FC = () => {
               onEdit={handleMenuEdit} 
               onDelete={handleMenuDelete}
               onClose={() => setMenuEdgeId(null)} // Simple close
-        />
+          />
       )}
     </div>
   );

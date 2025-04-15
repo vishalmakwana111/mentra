@@ -450,7 +450,7 @@ This file consolidates all completed tasks marked with `[X]` from the various ta
 
 ## From `all_tasks.md` & `plan.md`:
 
-(Note: These were high-level planning files, individual completed items are likely captured in the more specific task files above).
+(Note: These were high-level planning files, individual completed items are likely captured in the more specific task files above). 
 
 ## From `fixed_note_tags_tasks.md`:
 
@@ -496,25 +496,18 @@ This file consolidates all completed tasks marked with `[X]` from the various ta
 
 ## From `graph_edge_manipulation_tasks.md`:
 
-- [X] **Verify Backend Edge Deletion/Update Endpoints & Schema:** Ensured API and CRUD functions for deleting and updating edges (specifically relationship type/label) are working correctly.
-- [X] **Verify Frontend API Services:** Confirmed/created `deleteGraphEdge` and `updateGraphEdge` functions in `api.ts`.
-- [X] **Implement Frontend Deletion:** Added logic to `MindMapCanvas.tsx` to handle edge deletion via the `onEdgesChange` handler, call the API, update the `graphStore`, and provide user feedback with toasts.
-- [X] **Implement Frontend Editing (Label/Type):** 
-    - [X] Designed and implemented the double-click trigger on edge labels.
-    - [X] Created the `EdgeLabelEditor.tsx` component for inline editing.
-    - [X] Added state management in `MindMapCanvas.tsx` for the editing process.
-    - [X] Implemented save logic (`handleEdgeLabelSave`) to call the API, update the `graphStore`, and provide user feedback with toasts.
-- [X] **Testing:** Verified edge deletion and label editing functionalities, including success and error cases.
+- [X] **Phase 1: Backend Verification** (Endpoints, Schemas, API Service)
+- [X] **Phase 2: Frontend Deletion Implementation** (Event Handling, Logic, State, Feedback)
+- [X] **Phase 3: Frontend Editing Implementation** (Trigger, UI, State, Logic, Feedback)
+- [X] **Phase 4: Testing & Completion** 
 
 ## From `score_based_edge_types_styles.md`:
 
-- [X] **Backend Implementation:**
-    - [X] Created a helper function `get_relationship_label_from_score` that maps similarity scores to descriptive labels.
-    - [X] Updated edge creation logic to assign appropriate labels based on the similarity score.
-    - [X] Ensured backend schemas and APIs properly handle label and similarity score data.
-    - [X] Verified CRUD functions handle the JSONB data field correctly.
-- [X] **Frontend Implementation:**
-    - [X] Updated frontend types to include label and similarity_score fields.
-    - [X] Implemented edge styling logic in MindMapCanvas.tsx with a getEdgeStyle function.
-    - [X] Applied distinct visual styles to edges based on their relationship strength (varying colors and thicknesses).
-    - [X] Applied the styles to all edges displayed in the React Flow component. 
+- [X] **Backend:** Implemented a helper function (`get_relationship_label_from_score`) to map similarity scores to labels.
+- [X] **Backend:** Updated edge creation logic (`_find_and_create_similar_note_edges`) to use the helper function for the edge `label` and store the raw score in the edge `data`.
+- [X] **Backend:** Verified/Updated schemas (`GraphEdge`) and models (`GraphEdge`) to include `label` and handle `data`; applied database migration.
+- [X] **Frontend:** Updated types (`BackendGraphEdge`, `GraphEdge`) to include `label` and `data.similarity_score`.
+- [X] **Frontend:** Updated store (`graphStore.ts`) mapping logic to correctly assign the backend `label` and `data.similarity_score` to React Flow edge objects.
+- [X] **Frontend:** Defined distinct visual styles (`edgeStyles` constant) for each relationship label in `MindMapCanvas.tsx`.
+- [X] **Frontend:** Implemented conditional styling by mapping over edges and applying styles before passing them to ReactFlow.
+- [X] **Testing:** Verified that automatically created edges show correct labels and styles based on score, and manual edges retain default appearance. 

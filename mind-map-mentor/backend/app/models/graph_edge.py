@@ -13,6 +13,7 @@ class GraphEdge(Base):
     source_node_id = Column(Integer, ForeignKey("graph_nodes.id"), nullable=False)
     target_node_id = Column(Integer, ForeignKey("graph_nodes.id"), nullable=False)
     relationship_type = Column(String, index=True, default="related") # e.g., 'related', 'contains', 'part_of'
+    label = Column(String, index=True, nullable=True) # Add label column for display
     # Store flexible edge properties (e.g., weight, description)
     data = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

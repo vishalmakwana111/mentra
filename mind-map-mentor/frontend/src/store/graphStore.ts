@@ -133,22 +133,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               return null; // Skip this edge
           }
 
-          // Get the similarity score from data if available
-          const similarityScore = edge.data?.similarity_score;
-          
-          // Create edge data with similarity score if available
-          const edgeData = {
-              similarity_score: similarityScore
-          };
+          // Prepare edge data object including the similarity score
+          const edgeData: { [key: string]: any } = {};
+          if (edge.data?.similarity_score !== undefined) {
+              edgeData.similarity_score = edge.data.similarity_score;
+          }
 
           return {
               id: `edge-${edge.id}`,
               source: sourceNodeIdStr,
               target: targetNodeIdStr,
-              label: edge.label || edge.relationship_type, // Prefer label if available
-              data: edgeData, // Add edge data
+              label: edge.label, // Use the label field from the backend
+              data: edgeData, // Add the data object with score
           };
-      }).filter((edge): edge is Edge => edge !== null); 
+      }).filter((edge): edge is Edge => edge !== null);
 
       set({
         nodes: reactFlowNodes,
@@ -359,10 +357,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           id: `edge-${newEdge.id}`,
           source: sourceNodeIdStr,
           target: targetNodeIdStr,
-          label: newEdge.label || newEdge.relationship_type,
-          data: {
-            similarity_score: newEdge.data?.similarity_score
-          }
+          label: newEdge.relationship_type,
       };
 
     set((state) => ({

@@ -77,17 +77,20 @@ class GraphEdgeBase(BaseModel):
     source_node_id: int
     target_node_id: int
     relationship_type: Optional[str] = None
+    label: Optional[str] = None # Add label field for display
     data: Optional[Dict[str, Any]] = None # Flexible data payload (JSON)
 
 class GraphEdgeCreate(GraphEdgeBase):
     # Specific creation requirements, if any (already covered by Base)
-    pass
+    # Make label optional here as well
+    label: Optional[str] = None 
 
-class GraphEdgeUpdate(GraphEdgeBase):
+class GraphEdgeUpdate(BaseModel): # Make this not inherit from Base to allow partial updates
     # All fields optional on update
     source_node_id: Optional[int] = None
     target_node_id: Optional[int] = None
     relationship_type: Optional[str] = None
+    label: Optional[str] = None # Add label field
     data: Optional[Dict[str, Any]] = None
 
 # Properties shared by models stored in DB
@@ -103,8 +106,4 @@ class GraphEdgeInDBBase(GraphEdgeBase):
 
 # Properties to return to client
 class GraphEdge(GraphEdgeInDBBase):
-    # Add computed field for label (if needed for frontend compatibility)
-    @computed_field
-    @property
-    def label(self) -> Optional[str]:
-        return self.relationship_type  # Use relationship_type as the label 
+    pass 
