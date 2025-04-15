@@ -80,6 +80,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
                     id: backendNode.id,
                     label: backendNode.label ?? 'Untitled Note',
                     content: backendNode.data.content, // Assuming content is in data
+                    tags: backendNode.data.tags, // Add tags mapping
                     created_at: backendNode.created_at,
                     updated_at: backendNode.updated_at,
                     original_note_id: backendNode.data.original_note_id, // Get original ID from data

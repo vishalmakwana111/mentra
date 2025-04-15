@@ -28,7 +28,7 @@ async def create_note(
     current_user: models.User = Depends(deps.get_current_active_user)
 ):
     """Create a new note for the current user."""
-    note = crud.create_note(db=db, note_in=note_in, user_id=current_user.id)
+    note = await crud.create_note(db=db, note_in=note_in, user_id=current_user.id)
     return note
 
 @router.get("/{note_id}", response_model=schemas.Note, summary="Get a specific note by ID")
@@ -52,7 +52,7 @@ async def update_note(
     current_user: models.User = Depends(deps.get_current_active_user)
 ):
     """Update a note owned by the current user."""
-    note = crud.update_note(db, note_id=note_id, note_in=note_in, user_id=current_user.id)
+    note = await crud.update_note(db, note_id=note_id, note_in=note_in, user_id=current_user.id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     return note

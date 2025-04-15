@@ -14,13 +14,15 @@ interface NoteNodeData {
   // Ensure original_note_id and graph_node_id are passed if needed for updates
   original_note_id?: number;
   graph_node_id?: number;
+  tags?: string[]; // Added tags property
 }
 
 // Using memo for performance optimization, as nodes might re-render often
 const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // Destructure id from props
+  const { label, content, tags } = data; // Destructure tags here
   // State for inline editing
   const [isEditing, setIsEditing] = useState(false);
-  const [editedContent, setEditedContent] = useState(data.content || '');
+  const [editedContent, setEditedContent] = useState(content || '');
 
   // Get store actions
   const updateNoteContent = useGraphStore((state) => state.updateNoteContent); // Use the new action
@@ -31,15 +33,15 @@ const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // 
 
   // Function to handle starting the edit
   const handleDoubleClick = useCallback(() => {
-    setEditedContent(data.content || ''); 
+    setEditedContent(content || ''); 
     setIsEditing(true);
     console.debug(`[NoteNode ${id}] Started editing.`);
-  }, [data.content]); // Dependency on data.content to re-initialize correctly
+  }, [content]); // Dependency on content to re-initialize correctly
 
   // Function to handle saving the edit (on blur)
   const handleSave = useCallback(async () => {
     // Only save if content actually changed
-    if (editedContent !== data.content) {
+    if (editedContent !== content) {
       console.debug(`[NoteNode ${id}] Content changed. Saving...`);
       const originalNoteId = data.original_note_id;
       
@@ -52,7 +54,7 @@ const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // 
         } catch (error) {
           console.error(`[NoteNode ${id}] Failed to save content:`, error);
           // Optionally: Revert editedContent state or show error toast
-          setEditedContent(data.content || ''); // Revert on error
+          setEditedContent(content || ''); // Revert on error
         }
       } else {
         console.warn(`[NoteNode ${id}] Cannot save, missing original_note_id.`);
@@ -61,11 +63,11 @@ const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // 
       console.debug(`[NoteNode ${id}] Content unchanged. Closing edit mode.`);
     }
     setIsEditing(false); // Exit edit mode regardless of save status
-  }, [editedContent, data.content, data.original_note_id, id, updateNoteContent]); // Update dependencies
+  }, [editedContent, content, data.original_note_id, id, updateNoteContent]); // Update dependencies
 
   const maxContentLength = 100; // Max characters to show initially
-  const displayContent = data.content
-    ? (data.content.length > maxContentLength ? data.content.substring(0, maxContentLength) + '...' : data.content)
+  const displayContent = content
+    ? (content.length > maxContentLength ? content.substring(0, maxContentLength) + '...' : content)
     : ''; // Show empty string if no content
 
   return (
@@ -81,7 +83,7 @@ const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // 
       
       {/* Node Content */}
       <div className="p-3">
-        <div className="font-bold text-sm text-gray-800 mb-1 truncate" title={data.label}>{data.label || 'Untitled Note'}</div>
+        <div className="font-bold text-sm text-gray-800 mb-1 truncate" title={label}>{label || 'Untitled Note'}</div>
         
         {/* Conditionally render display text or textarea */}
         {isEditing ? (
@@ -105,7 +107,23 @@ const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, id }) => { // 
           </div>
         )}
       </div>
-      
+
+      {/* Tag Display Area (Tasks 5.2-5.5) */}
+      {tags && tags.length > 0 && (
+        <div className="p-3 pt-1 border-t border-gray-200">
+          {
+            tags.map((tag, index) => (
+              <span 
+                key={index} 
+                className="inline-block bg-sky-100 text-sky-800 text-xs font-medium mr-1 mb-1 px-2 py-0.5 rounded"
+              >
+                {tag}
+              </span>
+            ))
+          }
+        </div>
+      )}
+
       {/* Output Handle (Bottom) */}
       <Handle type="source" position={Position.Bottom} className="!bg-gray-500 w-2 h-2" />
     </div>

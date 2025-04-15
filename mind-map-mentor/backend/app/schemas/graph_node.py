@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 # Nested schema for position
@@ -35,6 +35,7 @@ class GraphNodeInDBBase(GraphNodeBase):
 
 # Properties to return to client
 class GraphNode(GraphNodeInDBBase):
+    tags: Optional[List[str]] = None
     pass
 
 # Properties stored in DB

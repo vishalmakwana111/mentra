@@ -58,6 +58,7 @@ interface BaseGraphNodeData {
 interface NoteNodeData extends BaseGraphNodeData {
     type: 'note';
     content: string | null;
+    tags?: string[] | null; // Add optional tags field
     // Include other relevant note fields if needed for display/interaction
     created_at: string;
     updated_at: string | null;
