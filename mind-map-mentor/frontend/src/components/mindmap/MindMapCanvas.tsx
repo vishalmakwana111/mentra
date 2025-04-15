@@ -1,6 +1,6 @@
 'use client'; // Required for hooks like useState, useCallback
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -14,6 +14,10 @@ import ReactFlow, {
   EdgeChange,
   Connection,
   BackgroundVariant,
+  useReactFlow, // Import useReactFlow hook
+  EdgeLabelRenderer, // Import EdgeLabelRenderer
+  getBezierPath, // Import getBezierPath
+  XYPosition // Import XYPosition
 } from 'reactflow';
 
 import 'reactflow/dist/style.css'; // Import default styles
@@ -26,7 +30,8 @@ import {
     fetchGraphEdges,
     createGraphEdge,
     deleteGraphEdge,
-    updateFilePosition
+    updateFilePosition,
+    updateGraphEdge // Import updateGraphEdge
 } from '@/services/api';
 import { 
     Note as ApiNote, 
@@ -35,7 +40,8 @@ import {
     GraphNodeData,
     BackendGraphEdge as ApiGraphEdge,
     NoteNodeData,
-    FileNodeData
+    FileNodeData,
+    GraphEdgeUpdatePayload // Import payload type
 } from '@/types';
 
 // Import the custom node type
@@ -43,6 +49,9 @@ import NoteNode from './NoteNode';
 import FileNode from './FileNode';
 // Import the modal
 import NoteEditModal from '../modals/NoteEditModal'; // Adjust path as needed
+import EdgeLabelEditor from './EdgeLabelEditor'; // Import the new editor
+import EdgeActionMenu from './EdgeActionMenu'; // Import the action menu
+import toast from 'react-hot-toast';
 
 // Import Zustand Store
 import { useGraphStore } from '@/store/graphStore';
@@ -56,21 +65,33 @@ const MindMapCanvas: React.FC = () => {
     error,
     fetchGraphData,
     updateNodeData, // Use the generic update action
-    addEdge, // Use store action
-    deleteEdge // Use store action
+    addEdge: addEdgeToStore, // Use store action
+    deleteEdge: deleteEdgeFromStore, // Use store action
+    updateEdge: updateEdgeInStore // Make sure this exists in the store
     // Get files state if needed for handlers, e.g., double-click
     // files: apiFiles 
   } = useGraphStore();
 
   // Local state only for the modal
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingNodeData, setEditingNodeData] = useState<GraphNodeData | null>(null);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState<boolean>(false);
+  const [editingNoteData, setEditingNoteData] = useState<GraphNodeData | null>(null);
+
+  // Task 9.1: Local state for edge label editing
+  const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null); 
+  const [editedEdgeLabel, setEditedEdgeLabel] = useState<string>('');
+
+  // Task 2: Add state for edge action menu
+  const [menuEdgeId, setMenuEdgeId] = useState<string | null>(null); // ID of edge for the menu
+  const [menuPosition, setMenuPosition] = useState<XYPosition | null>(null); // Position for the menu
 
   // Define the node types
   const nodeTypes = useMemo(() => ({
      noteNode: NoteNode, 
      fileNode: FileNode, // Add fileNode type
   }), []);
+
+  // Define edge types (even if empty right now)
+  const edgeTypes = useMemo(() => ({}), []);
 
   // Fetch initial data using the store action on component mount
   useEffect(() => {
@@ -89,47 +110,14 @@ const MindMapCanvas: React.FC = () => {
     []
   );
   
+  // Task 7: Remove deletion logic from onEdgesChange
   const onEdgesChange = useCallback(
-    async (changes: EdgeChange[]) => {
-      let changeApplied = false;
-      const edgesToRemove: string[] = [];
-
-      for (const change of changes) {
-        if (change.type === 'remove') {
-          changeApplied = true;
-          edgesToRemove.push(change.id);
-        }
-      }
-
-      if (edgesToRemove.length > 0) {
-        console.log(`Attempting to remove edges with IDs: ${edgesToRemove.join(', ')}`);
-        // Perform API calls and update store state (async)
-        // We don't wait here, let the UI update immediately if needed by applyEdgeChanges
-        edgesToRemove.forEach(async (edgeIdToRemove) => {
-            // Extract original backend ID from prefixed ID (e.g., 'edge-123')
-            const backendEdgeId = parseInt(edgeIdToRemove.replace('edge-', ''), 10);
-            if (isNaN(backendEdgeId)) {
-                console.error(`Invalid edge ID format for removal: ${edgeIdToRemove}`);
-                return; // Skip invalid ID
-            }
-            try {
-              await deleteGraphEdge(backendEdgeId);
-              console.log(`Edge ${backendEdgeId} deleted successfully via API.`);
-              deleteEdge(backendEdgeId); // Update store
-            } catch (error) {
-              console.error(`Failed to delete edge ${backendEdgeId}:`, error);
-              // TODO: Display error to user
-            }
-        });
-      }
-
-      // Apply non-remove changes (like selection) to the store's edge state
-      const nonRemoveChanges = changes.filter(change => change.type !== 'remove');
-      if (nonRemoveChanges.length > 0) {
-        useGraphStore.setState(state => ({ edges: applyEdgeChanges(nonRemoveChanges, state.edges) }));
-      }
+    (changes: EdgeChange[]) => {
+      console.log("onEdgesChange triggered (only selection changes):", changes); 
+      // Only apply non-remove changes (like selection) directly
+      useGraphStore.setState(state => ({ edges: applyEdgeChanges(changes, state.edges) }));
     },
-    [deleteEdge] // Depend on store action
+    [] // No dependencies needed now
   );
 
   const onConnect = useCallback(async (connection: Connection) => {
@@ -160,14 +148,14 @@ const MindMapCanvas: React.FC = () => {
       try {
           const newApiEdge = await createGraphEdge(edgeData);
           console.log('Edge created successfully via API:', newApiEdge);
-          addEdge(newApiEdge); // Add the confirmed edge to the store
+          addEdgeToStore(newApiEdge); // Add the confirmed edge to the store
 
       } catch (error) {
           console.error("Failed to create edge:", error);
           // TODO: Display error to user. React Flow might show the connection failing.
       }
     },
-    [addEdge] // Depend on store action
+    [addEdgeToStore] // Depend on store action
   );
 
   // Update drag stop handler to use updateNodeData
@@ -233,46 +221,149 @@ const MindMapCanvas: React.FC = () => {
   // Update double click handler
   const handleNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node<GraphNodeData>) => {
     if (node.data.type === 'note') {
-        setEditingNodeData(node.data); // Store the whole data object
-        setIsModalOpen(true);
+        setEditingNoteData(node.data);
+        setIsNoteModalOpen(true);
     } else {
         // Handle double click for file nodes if needed (e.g., open preview?)
         console.log('Double clicked file node:', node.data.label);
     }
   }, []);
 
+  // Edge Interaction Handlers
+  // Task 3: Modify handleEdgeDoubleClick to open menu
+  const handleEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+      event.preventDefault(); // Prevent default browser behavior
+      console.log('Edge double clicked:', edge);
+      setMenuEdgeId(edge.id); // Set the ID for the menu
+      // Position the menu near the click event
+      setMenuPosition({ x: event.clientX, y: event.clientY }); 
+      setEditingEdgeId(null); // Ensure inline editor is closed
+  }, []);
+
+  // Edge Label Editor Handlers
+  const handleEdgeLabelSave = useCallback(async () => {
+      if (!editingEdgeId) return;
+
+      const currentEdge = edges.find(e => e.id === editingEdgeId);
+      if (!currentEdge) {
+          setEditingEdgeId(null);
+          return;
+      }
+
+      const originalLabel = currentEdge.label as string || '';
+      const backendEdgeId = parseInt(editingEdgeId.replace('edge-', ''), 10);
+      if (isNaN(backendEdgeId)) {
+          toast.error("Save failed: Invalid edge ID.");
+          setEditingEdgeId(null);
+          return;
+      }
+
+      if (editedEdgeLabel !== originalLabel) {
+          const updatePayload: GraphEdgeUpdatePayload = { relationship_type: editedEdgeLabel };
+          try {
+              await updateGraphEdge(backendEdgeId, updatePayload);
+              updateEdgeInStore(backendEdgeId, { label: editedEdgeLabel }); // Update store
+              toast.success("Edge label updated");
+          } catch (error) {
+              toast.error("Failed to update edge label");
+          }
+      } 
+      setEditingEdgeId(null); // Exit editing mode
+  }, [editingEdgeId, editedEdgeLabel, edges, updateEdgeInStore]);
+
+  // --- Menu Action Handlers ---
+  const handleMenuEdit = useCallback(() => {
+    console.log("[handleMenuEdit] Fired. Current menuEdgeId:", menuEdgeId);
+    if (menuEdgeId) {
+      const edgeToEdit = edges.find(e => e.id === menuEdgeId);
+      console.log("[handleMenuEdit] Found edge to edit:", edgeToEdit);
+      const initialLabel = edgeToEdit?.label as string || '';
+      console.log(`[handleMenuEdit] Setting editingEdgeId to: ${menuEdgeId}, initialLabel: "${initialLabel}"`);
+      setEditingEdgeId(menuEdgeId); // Open inline editor
+      setEditedEdgeLabel(initialLabel); // Initialize editor
+    } else {
+      console.log("[handleMenuEdit] No menuEdgeId set.");
+    }
+    console.log("[handleMenuEdit] Closing menu (setting menuEdgeId to null).");
+    setMenuEdgeId(null); // Close menu
+    setMenuPosition(null);
+  }, [menuEdgeId, edges]);
+
+  // Task 5b: Handle Delete from Menu
+  const handleMenuDelete = useCallback(async () => {
+    if (!menuEdgeId) return;
+    
+    console.log(`[handleMenuDelete] Deleting edge with RF ID: ${menuEdgeId}`);
+    const backendEdgeId = parseInt(menuEdgeId.replace('edge-', ''), 10);
+    console.log(`[handleMenuDelete] Parsed Backend ID: ${backendEdgeId}`);
+
+    if (isNaN(backendEdgeId)) {
+      toast.error("Delete failed: Invalid edge ID.");
+      setMenuEdgeId(null);
+      setMenuPosition(null);
+      return;
+    }
+    
+    const edgeToDelete = menuEdgeId; // Store before resetting state
+    setMenuEdgeId(null); // Close menu immediately
+    setMenuPosition(null);
+
+    try {
+      console.log(`[handleMenuDelete] Calling API deleteGraphEdge(${backendEdgeId})...`);
+      await deleteGraphEdge(backendEdgeId); 
+      console.log(`[handleMenuDelete] API deleteGraphEdge(${backendEdgeId}) SUCCEEDED.`);
+      
+      console.log(`[handleMenuDelete] Calling store deleteEdgeFromStore(${backendEdgeId})...`);
+      deleteEdgeFromStore(backendEdgeId); 
+      console.log(`[handleMenuDelete] Store deleteEdgeFromStore(${backendEdgeId}) finished.`);
+      
+      toast.success("Edge deleted.");
+    } catch (error) {
+      console.error(`[handleMenuDelete] API deleteGraphEdge(${backendEdgeId}) FAILED:`, error);
+      toast.error("Failed to delete edge.");
+    }
+
+  }, [menuEdgeId, deleteEdgeFromStore]);
+
+  // Task 6: Handle closing the menu on pane click
+  const onPaneClick = useCallback(() => {
+    console.log("Pane clicked");
+    setEditingEdgeId(null); // Close inline editor if open
+    setMenuEdgeId(null); // Close action menu if open
+    setMenuPosition(null);
+  }, []);
+
   // Modal Handlers
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-    setEditingNodeData(null);
+  const handleNoteModalClose = () => {
+    setIsNoteModalOpen(false);
+    setEditingNoteData(null);
   };
 
   // Update modal save handler
-  const handleModalSave = async (updatedData: NoteUpdateData) => {
-      if (!editingNodeData || editingNodeData.type !== 'note') return;
+  const handleNoteModalSave = async (updatedData: NoteUpdateData) => {
+      if (!editingNoteData || typeof editingNoteData.original_note_id !== 'number') return;
       
-      const nodeId = `note-${editingNodeData.id}`;
-      console.log("Attempting to save note:", nodeId, "Data:", updatedData);
       try {
-          // Call the API service function
-          await updateNote(editingNodeData.id, updatedData);
-          console.log("Note saved successfully via API:", nodeId);
-
-          // Update the store state using the generic action
-          // Prepare partial GraphNodeData update
-          const dataUpdate: Partial<GraphNodeData> = {
-              label: updatedData.title, // Update label if title changed
-              content: updatedData.content, // Update content
-              // Note: position is updated via drag handler
-          };
-          updateNodeData(nodeId, dataUpdate);
-          console.log("Note updated in store:", nodeId);
-
-          handleModalClose(); // Close modal on success
-      } catch (error: any) {
-          console.error("Failed to save note via modal:", error);
-          throw error; 
+          await updateNote(editingNoteData.original_note_id, updatedData);
+          const nodeId = getNodeId('note', editingNoteData.id);
+          if (nodeId) {
+              const storeUpdate: Partial<NoteNodeData> = {};
+              if (updatedData.title !== undefined) storeUpdate.label = updatedData.title;
+              if (updatedData.content !== undefined) storeUpdate.content = updatedData.content;
+              updateNodeData(nodeId, storeUpdate);
+          }
+          toast.success('Note updated!');
+          handleNoteModalClose();
+      } catch (error) {
+          console.error("Failed to update note:", error);
+          toast.error('Failed to update note.');
       }
+  };
+
+  // Helper to get node ID string
+  const getNodeId = (type: 'note' | 'file', graphNodeId: number | null | undefined): string | null => {
+      if (graphNodeId === null || graphNodeId === undefined) return null;
+      return `${type}-${graphNodeId}`;
   };
 
   // Display loading or error state
@@ -287,32 +378,55 @@ const MindMapCanvas: React.FC = () => {
   return (
     <div style={{ height: '100%', width: '100%' }}>
       <ReactFlow
-        nodes={nodes} // Use nodes from store
-        edges={edges} // Use edges from store
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        nodeTypes={nodeTypes} // Pass the defined node types
         onNodeDragStop={handleNodeDragStop}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onEdgeDoubleClick={handleEdgeDoubleClick}
+        onPaneClick={onPaneClick}
         fitView
+        fitViewOptions={{ padding: 0.2 }}
         className="bg-gradient-to-br from-blue-50 via-white to-violet-50"
       >
         <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        
+        {/* Edge Label Editor - Moved inside ReactFlow */}
+        {editingEdgeId && (
+          <EdgeLabelEditor 
+            edgeId={editingEdgeId} 
+            initialLabel={editedEdgeLabel}
+            setEditedLabel={setEditedEdgeLabel}
+            onSave={handleEdgeLabelSave} 
+            onCancel={() => setEditingEdgeId(null)} 
+          />
+        )}
       </ReactFlow>
-      {/* Modal rendering - pass appropriate data */} 
-      {isModalOpen && editingNodeData && editingNodeData.type === 'note' && (
-        <NoteEditModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          onSave={handleModalSave}
-          initialData={{
-              title: editingNodeData.label,
-              content: editingNodeData.content
-          }}
-        />
+      
+      {/* Note Edit Modal */}
+      {isNoteModalOpen && editingNoteData && editingNoteData.type === 'note' && (
+          <NoteEditModal
+              isOpen={isNoteModalOpen}
+              onClose={handleNoteModalClose}
+              noteData={editingNoteData}
+              onSave={handleNoteModalSave}
+          />
+      )}
+      {/* Task 4: Conditionally render Edge Action Menu */} 
+      {menuEdgeId && menuPosition && (
+          <EdgeActionMenu 
+              top={menuPosition.y}
+              left={menuPosition.x}
+              onEdit={handleMenuEdit} 
+              onDelete={handleMenuDelete}
+              onClose={() => setMenuEdgeId(null)} // Simple close
+          />
       )}
     </div>
   );

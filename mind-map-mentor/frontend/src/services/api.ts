@@ -215,6 +215,15 @@ interface GraphEdgeCreatePayload {
     data?: { [key: string]: any } | null;
 }
 
+// Define the payload for updating an edge (matches backend GraphEdgeUpdate schema)
+// Task 3: Add this type
+interface GraphEdgeUpdatePayload {
+    source_node_id?: number | null; // Usually not updated, but included for completeness
+    target_node_id?: number | null; // Usually not updated
+    relationship_type?: string | null;
+    data?: { [key: string]: any } | null;
+}
+
 // Fetch ALL Graph Nodes (Notes, Files, etc.)
 export const fetchGraphNodes = async (skip: number = 0, limit: number = 1000): Promise<BackendGraphNode[]> => {
     try {
@@ -251,23 +260,31 @@ export const createGraphEdge = async (edgeData: GraphEdgeCreatePayload): Promise
         return response.data;
     } catch (error: any) {
         console.error('Create Graph Edge API error:', error.response?.data || error.message);
-        // Provide more specific feedback if possible (e.g., from ValueError in CRUD)
-        const detail = error.response?.data?.detail || 'Failed to create graph edge';
-        if (detail.includes("not found or does not belong to user")) {
-            throw new Error("Cannot create edge: Source or target node not found.");
-        }
-        throw new Error(detail);
+        throw new Error(error.response?.data?.detail || 'Failed to create graph edge');
     }
 };
 
-// Delete a Graph Edge by ID
+// Delete a Graph Edge (Verified in Task 1)
 export const deleteGraphEdge = async (edgeId: number): Promise<void> => {
+  try {
+    const response = await apiClient.delete(`/graph/edges/${edgeId}`);
+    console.log('Delete Graph Edge API response status:', response.status);
+  } catch (error: any) {
+    console.error('Delete Graph Edge API error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.detail || 'Failed to delete graph edge');
+  }
+};
+
+// Task 3: Add updateGraphEdge function
+// Update a Graph Edge
+export const updateGraphEdge = async (edgeId: number, edgeData: GraphEdgeUpdatePayload): Promise<BackendGraphEdge> => {
     try {
-        const response = await apiClient.delete(`/graph/edges/${edgeId}`);
-        console.log('Delete Graph Edge API response status:', response.status);
+        const response = await apiClient.put<BackendGraphEdge>(`/graph/edges/${edgeId}`, edgeData);
+        console.log('Updated Graph Edge:', response.data);
+        return response.data;
     } catch (error: any) {
-        console.error('Delete Graph Edge API error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.detail || 'Failed to delete graph edge');
+        console.error('Update Graph Edge API error:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.detail || 'Failed to update graph edge');
     }
 };
 

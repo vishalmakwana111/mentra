@@ -127,7 +127,7 @@ async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
         db_note.graph_node_id = graph_node.id
         graph_node.data["original_note_id"] = db_note.id # Update data field
         flag_modified(graph_node, "data") # Mark data as modified
-        
+
         db.add(db_note) # Already added, but ensures it's in the session state
         db.add(graph_node) # Already added, but ensures it's in the session state
 
@@ -148,7 +148,7 @@ async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
             except Exception as tag_error:
                 logger.error(f"Failed to generate tags for note {db_note.id}: {tag_error}", exc_info=True)
                 # Continue without tags if generation fails
-
+        
     except Exception as e:
         logger.error(f"Error during note/graph node creation or linking: {e}", exc_info=True)
         db.rollback() # Rollback the transaction on any error during the main block
@@ -256,7 +256,7 @@ async def update_note(
         position_updated = False
 
         # Apply standard field updates to Note model
-        for key, value in update_data.items():
+    for key, value in update_data.items():
             # Skip 'tags' here, handle separately below for GraphNode
             if key == 'tags':
                 continue 
@@ -276,8 +276,8 @@ async def update_note(
                  position_updated = True
             # Apply other direct updates to Note model
             elif hasattr(db_note, key):
-                setattr(db_note, key, value)
-
+        setattr(db_note, key, value)
+        
         # Update GraphNode related fields if graph_node exists
         if graph_node:
             # Update GraphNode position if changed
@@ -398,7 +398,7 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
             else:
                  logger.warning(f"GraphNode {graph_node_id_to_delete} associated with note {note_id_to_delete} not found or delete failed.")
                  # Continue to delete the note itself
-
+        
         # Now delete the note
         logger.info(f"Deleting Note {note_id_to_delete}")
         db.delete(db_note)
@@ -418,7 +418,7 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
     except Exception as e:
         logger.error(f"Error during deletion of note {note_id_to_delete} or associated data: {e}", exc_info=True)
         db.rollback()
-        return None
+        return None 
 
 # Task 3.7: API Response Verification Note:
 # The CRUD functions now correctly STORE tags in the GraphNode.data field.

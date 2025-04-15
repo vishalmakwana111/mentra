@@ -493,3 +493,10 @@ This file consolidates all completed tasks marked with `[X]` from the various ta
     - [X] Test Remove All.
     - [X] Test Interaction with AI Tags.
     - [X] Test Error Handling. 
+
+## From `graph_edge_manipulation_tasks.md`:
+
+- [X] **Phase 1: Backend Verification** (Endpoints, Schemas, API Service)
+- [X] **Phase 2: Frontend Deletion Implementation** (Event Handling, Logic, State, Feedback)
+- [X] **Phase 3: Frontend Editing Implementation** (Trigger, UI, State, Logic, Feedback)
+- [X] **Phase 4: Testing & Completion** 

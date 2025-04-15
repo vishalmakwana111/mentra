@@ -36,6 +36,7 @@ interface GraphState {
   removeFileNode: (fileId: number) => void; // Action to remove file node
   addEdge: (newEdge: GraphEdge) => void; // Renamed
   deleteEdge: (edgeId: number) => void; // Renamed
+  updateEdge: (edgeId: number, dataUpdate: Partial<Edge>) => void; // Task 11.1: Add action signature
 }
 
 // Helper to generate prefixed string ID using GraphNode ID
@@ -368,4 +369,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }));
     console.log('GraphStore: Deleted Edge with ID:', edgeId);
   },
+
+  // Task 11.1: Implement updateEdge action
+  updateEdge: (edgeId: number, dataUpdate: Partial<Edge>) => {
+    set((state) => ({
+        edges: state.edges.map((edge) => 
+            edge.id === `edge-${edgeId}` 
+            ? { ...edge, ...dataUpdate } // Merge updates (e.g., new label)
+            : edge
+        )
+    }));
+    console.log(`GraphStore: Updated edge with backend ID ${edgeId} with data:`, dataUpdate);
+  }
 })); 
