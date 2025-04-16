@@ -1,0 +1,57 @@
+INFO:     127.0.0.1:51761 - "OPTIONS /api/v1/notes/14 HTTP/1.1" 200 OK
+[get_graph_node] Querying for Node ID=14, User ID=2
+[get_graph_node] Result for Node ID=14: Found
+INFO:app.crud.crud_note:Updating note 14...
+INFO:app.crud.crud_note:Updating GraphNode 14 position to {'x': -201.55429192912572, 'y': -491.86386153543833}
+INFO:app.crud.crud_note:Successfully committed main updates for Note 14 and GraphNode 14.
+INFO:     127.0.0.1:51761 - "PUT /api/v1/notes/14 HTTP/1.1" 200 OK
+[get_graph_node] Querying for Node ID=14, User ID=2
+[get_graph_node] Result for Node ID=14: Found
+INFO:app.crud.crud_note:Updating note 14...
+INFO:app.crud.crud_note:Updating GraphNode 14 position to {'x': -455.5542919291257, 'y': -645.8638615354383}
+INFO:app.crud.crud_note:Successfully committed main updates for Note 14 and GraphNode 14.
+INFO:     127.0.0.1:51761 - "PUT /api/v1/notes/14 HTTP/1.1" 200 OK
+[get_graph_node] Querying for Node ID=14, User ID=2
+[get_graph_node] Result for Node ID=14: Found
+INFO:app.crud.crud_note:Updating note 14...
+INFO:app.crud.crud_note:Updating GraphNode 14 position to {'x': -235.55429192912572, 'y': -581.8638615354383}
+INFO:app.crud.crud_note:Successfully committed main updates for Note 14 and GraphNode 14.
+INFO:     127.0.0.1:51762 - "PUT /api/v1/notes/14 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "OPTIONS /api/v1/notes/ HTTP/1.1" 200 OK
+INFO:app.crud.crud_note:Successfully created Note 16 and linked GraphNode 16
+INFO:app.crud.crud_note:Attempting to generate tags for note 16...
+INFO:app.ai.agents.organizer:Suggesting tags for content (truncated): Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. I...
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.ai.agents.organizer:Raw LLM Output for tags: retrieval-augmented generation, llm, external knowledge, vector database, hallucinations
+INFO:app.ai.agents.organizer:Parsed tags: ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations']
+INFO:app.crud.crud_note:Suggested tags for note 16: ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations']
+INFO:app.crud.crud_note:Stored tags ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations'] in data field for GraphNode 16
+INFO:app.ai.vectorstore:Attempting to upsert document with ID: note_16
+WARNING:app.ai.vectorstore:Pinecone vector store accessed before initialization. Initializing now.
+INFO:app.ai.vectorstore:Initializing Pinecone connection...
+INFO:app.ai.vectorstore:Successfully connected to Pinecone index 'mentra'.
+INFO:app.ai.vectorstore:Initializing embedding function...
+WARNING:app.ai.embeddings:OpenAI embedding function accessed before initialization. Initializing now.
+INFO:app.ai.embeddings:Initialized OpenAI Embedding function with model: text-embedding-3-small
+INFO:app.ai.vectorstore:Embedding function initialized.
+INFO:app.ai.vectorstore:PineconeVectorStore initialized successfully.
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+INFO:app.ai.vectorstore:Successfully upserted document note_16 via PineconeVectorStore.
+INFO:app.crud.crud_note:Successfully submitted note 16 for embedding and upsert.
+INFO:app.crud.crud_note:Finding similar notes for newly created note 16 for user 2...
+INFO:app.ai.vectorstore:Attempting vector search for query: 'Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks.', user_id: 2, top_k=6, filter={'user_id': 2}
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+[create_graph_edge] Checking source node: ID=16, User=2
+[get_graph_node] Querying for Node ID=16, User ID=2
+[get_graph_node] Result for Node ID=16: Found
+[create_graph_edge] Checking target node: ID=14, User=2
+[get_graph_node] Querying for Node ID=14, User ID=2
+[get_graph_node] Result for Node ID=14: Found
+[create_graph_edge] Both nodes found. Creating edge...
+[create_graph_edge] Edge created successfully: ID=21
+INFO:app.crud.crud_note:Created edge between graph nodes 16 and 14 with label "Strongly Related" (Similarity: 1.00)
+INFO:app.crud.crud_note:Finished automatic edge creation for note 16. Created 1 new edge(s).
+INFO:     127.0.0.1:51775 - "POST /api/v1/notes/ HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51775 - "GET /api/v1/graph/nodes/?skip=0&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51775 - "GET /api/v1/graph/edges/?skip=0&limit=1000 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51775 - "GET /api/v1/graph/edges?skip=0&limit=1000 HTTP/1.1" 200 OK
