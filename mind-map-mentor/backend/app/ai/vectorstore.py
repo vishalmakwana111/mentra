@@ -101,45 +101,74 @@ def get_vector_store() -> PineconeVectorStore:
 
 # --- Modified CRUD Operations using PineconeVectorStore ---
 
-def upsert_document(doc_id: str, text_content: str, metadata: Dict[str, Any]):
-    """Creates a LangChain Document and upserts it using PineconeVectorStore."""
-    logger.info(f"Attempting to upsert document with ID: {doc_id}") # Log start
+def upsert_document(
+    note_id: int, 
+    text_content: str, 
+    metadata: Dict[str, Any], 
+    summary_text: Optional[str] = None
+):
+    """Creates LangChain Documents and upserts content and summary vectors using PineconeVectorStore."""
+    logger.info(f"Attempting to upsert vectors for Note ID: {note_id}")
     try:
         vector_store = get_vector_store()
-        # Create a LangChain Document
-        # Note: PineconeVectorStore adds text to metadata by default under 'text' key
-        # We can provide our own metadata as well.
-        doc = Document(page_content=text_content, metadata=metadata)
-        logger.debug(f"Created LangChain Document object for upsert: {doc}") # Log document structure
+        
+        # 1. Upsert Content Vector
+        content_doc_id = f"note_{note_id}_content"
+        content_metadata = metadata.copy() # Avoid modifying original dict
+        content_metadata["embedding_type"] = "content"
+        
+        content_doc = Document(page_content=text_content, metadata=content_metadata)
+        logger.debug(f"Upserting content vector (ID: {content_doc_id}) for Note ID: {note_id}")
+        vector_store.add_documents(documents=[content_doc], ids=[content_doc_id])
+        logger.debug(f"Successfully submitted content vector upsert for Note ID: {note_id}")
+        
+        # 2. Upsert Summary Vector (if summary provided)
+        if summary_text and summary_text.strip():
+            summary_doc_id = f"note_{note_id}_summary"
+            summary_metadata = metadata.copy() # Use a fresh copy
+            summary_metadata["embedding_type"] = "summary"
+            
+            summary_doc = Document(page_content=summary_text, metadata=summary_metadata)
+            logger.debug(f"Upserting summary vector (ID: {summary_doc_id}) for Note ID: {note_id}")
+            vector_store.add_documents(documents=[summary_doc], ids=[summary_doc_id])
+            logger.debug(f"Successfully submitted summary vector upsert for Note ID: {note_id}")
+        else:
+            logger.debug(f"No summary provided or empty for Note ID: {note_id}. Skipping summary vector upsert.")
 
-        # add_documents expects a list. We provide the ID explicitly.
-        logger.debug(f"Calling vector_store.add_documents for ID: {doc_id}...") # Log before Pinecone call
-        vector_store.add_documents(documents=[doc], ids=[doc_id])
-        # Use INFO for successful confirmation
-        logger.info(f"Successfully upserted document {doc_id} via PineconeVectorStore.") # Log success
+        logger.info(f"Vector upsert process completed for Note ID: {note_id}")
+
     except Exception as e:
-        logger.error(f"Failed to upsert document {doc_id} via PineconeVectorStore: {e}", exc_info=True) # Keep exc_info=True for errors
+        logger.error(f"Failed during vector upsert process for Note ID: {note_id}: {e}", exc_info=True)
 
-def delete_document(doc_id: str):
-    """Deletes a document vector using PineconeVectorStore."""
+def delete_document(note_id: int):
+    """Deletes both content and summary vectors for a given note ID using PineconeVectorStore."""
+    content_doc_id = f"note_{note_id}_content"
+    summary_doc_id = f"note_{note_id}_summary"
+    ids_to_delete = [content_doc_id, summary_doc_id]
+    logger.info(f"Attempting to delete vectors for Note ID: {note_id} (IDs: {ids_to_delete})")
     try:
         vector_store = get_vector_store()
-        vector_store.delete(ids=[doc_id])
-        logger.debug(f"Deleted document {doc_id} via PineconeVectorStore.")
+        vector_store.delete(ids=ids_to_delete)
+        logger.info(f"Successfully submitted deletion request for vectors associated with Note ID: {note_id}")
     except Exception as e:
-        logger.error(f"Failed to delete document {doc_id} via PineconeVectorStore: {e}")
+        # Log error but don't prevent other operations, deletion is best-effort
+        logger.error(f"Failed during vector deletion process for Note ID: {note_id}: {e}", exc_info=True)
 
 def query_similar_notes(
     query_text: str,
-    user_id: int, # Add user_id parameter
+    user_id: int,
+    embedding_type_filter: str, # Add embedding type filter
     top_k: int = 5,
     filter: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
-    """Finds notes similar to the query text using PineconeVectorStore, filtered by user_id.
-       Now returns a list of dicts, each containing 'id', 'score', 'metadata', and 'page_content'.
+    """Finds vectors similar to the query text using PineconeVectorStore, filtered by user_id and embedding_type.
+       Returns a list of dicts, each containing 'id', 'score', 'metadata', and 'page_content'.
     """
-    # Ensure base filter includes the user_id
-    final_filter = {"user_id": user_id}
+    # Ensure base filter includes the user_id and embedding_type
+    final_filter = {
+        "user_id": user_id,
+        "embedding_type": embedding_type_filter # Add the mandatory type filter
+    }
     if filter: # Allow merging with other potential filters if needed later
         final_filter.update(filter)
 
@@ -151,7 +180,7 @@ def query_similar_notes(
         results_with_scores = vector_store.similarity_search_with_score(
             query=query_text,
             k=top_k,
-            filter=final_filter # Use the final filter with user_id
+            filter=final_filter # Use the final filter
         )
         logger.debug(f"vector_store.similarity_search_with_score returned: {results_with_scores}")
 

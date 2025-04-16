@@ -13,6 +13,7 @@ interface NoteEditModalProps {
 const NoteEditModal: React.FC<NoteEditModalProps> = ({ isOpen, onClose, noteData, onSave }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [userSummary, setUserSummary] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,12 +22,14 @@ const NoteEditModal: React.FC<NoteEditModalProps> = ({ isOpen, onClose, noteData
     if (noteData) {
       setTitle(noteData.title || '');
       setContent(noteData.content || '');
+      setUserSummary(noteData.userSummary || '');
       setError(null); // Clear previous errors
       setIsSaving(false);
     } else {
       // Reset form if no note data (might happen briefly)
       setTitle('');
       setContent('');
+      setUserSummary('');
     }
   }, [noteData]);
 
@@ -38,7 +41,8 @@ const NoteEditModal: React.FC<NoteEditModalProps> = ({ isOpen, onClose, noteData
     const updatedData: NoteUpdateData = {
       title: title,
       content: content,
-      // We don't update position here, only title/content
+      userSummary: userSummary,
+      // We don't update position here, only title/content/summary
     };
 
     try {
@@ -55,6 +59,8 @@ const NoteEditModal: React.FC<NoteEditModalProps> = ({ isOpen, onClose, noteData
   if (!isOpen || !noteData) {
     return null; // Don't render anything if not open or no data
   }
+
+  const summaryMaxLength = 30;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -80,6 +86,31 @@ const NoteEditModal: React.FC<NoteEditModalProps> = ({ isOpen, onClose, noteData
               className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               disabled={isSaving}
             />
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="noteSummary" className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Summary (for Linking)
+              <span 
+                className="ml-1.5 text-gray-400 hover:text-gray-600 cursor-help" 
+                title="Provide 1-5 core keywords (max 30 chars). This helps automatically link this note to similar notes based *only* on this summary."
+              >
+                ⓘ {/* Simple Info Icon */}
+              </span>
+            </label>
+            <textarea
+              id="noteSummary"
+              rows={2}
+              maxLength={summaryMaxLength}
+              value={userSummary}
+              onChange={(e) => setUserSummary(e.target.value)}
+              placeholder="Core keywords for linking... (max 30 chars)"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              disabled={isSaving}
+            />
+            <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {userSummary.length}/{summaryMaxLength}
+            </div>
           </div>
 
           <div className="mb-6">

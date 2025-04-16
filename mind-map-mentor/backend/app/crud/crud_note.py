@@ -3,9 +3,13 @@ from sqlalchemy.orm.attributes import flag_modified # Import flag_modified
 from typing import List, Optional, Tuple
 import logging # Add logging
 import math
+from datetime import datetime, timedelta
+from sqlalchemy import func, case, literal_column
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 from app.models.note import Note
 from app.models.graph_node import GraphNode
+from app.models.user import User
 from app.schemas.note import NoteCreate, NoteUpdate
 # Import graph CRUD and schema
 from app.crud import crud_graph
@@ -17,6 +21,14 @@ from app.ai.vectorstore import upsert_document, delete_document
 from app.core.config import settings # Import settings for threshold
 from app.ai.vectorstore import query_similar_notes # Need this for similarity search
 from app.ai.agents.organizer import suggest_tags_for_content # Task 3.1 Import
+
+# Define constants for relationship types
+RELATED_SUMMARY_EDGE_TYPE = "related_summary"
+RELATED_CONTENT_EDGE_TYPE = "related_content"
+
+# Fetch thresholds from settings
+SIMILARITY_THRESHOLD_SUMMARY = settings.SIMILARITY_THRESHOLD_SUMMARY
+SIMILARITY_THRESHOLD_CONTENT = settings.SIMILARITY_THRESHOLD_CONTENT
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG) # Explicitly set level for this logger
@@ -39,23 +51,39 @@ def get_relationship_label_from_score(score: float) -> str:
         # but good to have a fallback.
         return "Related" # Or perhaps None or an empty string?
 
-def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: int):
-    """Finds similar notes and creates edges if they meet the threshold."""
-    logger.debug(f"Entering _find_and_create_similar_note_edges for new Note ID: {new_note.id}...")
-    if not new_note.content or new_note.graph_node_id is None:
-        logger.warning(f"Skipping edge creation for note {new_note.id}: Missing content or graph_node_id.")
+# Add async here
+async def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: int, threshold: float):
+    """Finds notes with similar summaries and creates edges if they meet the threshold."""
+    logger.info(f"--- Entering _find_and_create_similar_note_edges for Note ID: {new_note.id} ---") # INFO level entry log
+    
+    # 1. Check if the new note has a summary
+    logger.info(f"Checking summary for Note {new_note.id}: '{new_note.user_summary}'") # INFO level log for summary value
+    if not new_note.user_summary or not new_note.user_summary.strip():
+        logger.info(f"Exiting: No user_summary provided for Note {new_note.id}.") # INFO level log for exit
+        return
+        
+    # Ensure graph_node_id exists (should always be true if called after create_note commit)
+    if new_note.graph_node_id is None:
+        logger.error(f"Critical: Cannot perform edge creation for Note {new_note.id} because graph_node_id is missing.")
         return
 
-    logger.info(f"Finding similar notes for newly created note {new_note.id} (GraphNode ID: {new_note.graph_node_id}) for user {user_id}...")
+    logger.info(f"Proceeding with summary similarity search for Note {new_note.id}...") # INFO level log for proceeding
     try:
-        # Pass user_id to query_similar_notes for filtering
-        similar_results = query_similar_notes(query_text=new_note.content, user_id=user_id, top_k=6)
-        logger.debug(f"Raw similar_results from query (count: {len(similar_results)}): {similar_results}")
+        # 2. Query for similar summaries
+        similar_results = query_similar_notes(
+            query_text=new_note.user_summary, # Use the summary for the query
+            user_id=user_id, 
+            embedding_type_filter="summary", # Filter for summary embeddings
+            top_k=6 # Fetch a few potential matches
+        )
+        logger.info(f"Summary similarity query returned {len(similar_results)} results for Note {new_note.id}.") # INFO level log for result count
+        logger.debug(f"Raw similar summary results: {similar_results}") # Keep DEBUG for full results
         
         created_edge_count = 0
         if not similar_results:
-             logger.debug("No similar results found.")
+             logger.debug("No similar summaries found.")
              
+        # 3. Process results (largely the same as before, but based on summary scores)
         for i, result in enumerate(similar_results):
             logger.debug(f"--- Processing similarity result {i+1}/{len(similar_results)} ---: {result}")
             score = result.get('score')
@@ -73,15 +101,15 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
                 continue
                 
             # Log the score for every potential match before threshold check
-            logger.debug(f"Similarity check: Note {new_note.id} -> Note {similar_note_id} | Score: {score:.4f}")
+            logger.debug(f"Summary Similarity Check: Note {new_note.id} -> Note {similar_note_id} | Score: {score:.4f}")
 
             # Check threshold
-            if score < settings.SIMILARITY_THRESHOLD:
-                logger.debug(f"Skipping result {i+1}: Score {score:.4f} is below threshold {settings.SIMILARITY_THRESHOLD} for Note {similar_note_id}.")
+            if score < threshold: # Use the passed threshold
+                logger.debug(f"Skipping result {i+1}: Summary score {score:.4f} is below threshold {threshold} for Note {similar_note_id}.")
                 continue
 
-            # Get the graph_node_id for the similar note
-            logger.debug(f"Attempting to fetch details for similar Note ID: {similar_note_id}...")
+            # Get the graph_node_id for the similar note (needed to create the edge)
+            logger.debug(f"Attempting to fetch details for similar Note ID: {similar_note_id} (found via summary)...")
             similar_note = get_note(db, note_id=similar_note_id, user_id=user_id)
             if not similar_note or similar_note.graph_node_id is None:
                 logger.warning(f"Skipping result {i+1}: Could not find valid similar note or its graph node in DB (Note ID: {similar_note_id})")
@@ -93,16 +121,16 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
 
             # TODO: Optional - Check if edge already exists between source_graph_node_id and target_graph_node_id
 
-            # Create the edge
+            # Create the edge (using the label derived from the summary score)
             try:
                 relationship_label = get_relationship_label_from_score(score)
-                edge_data = {'similarity_score': score}
-                logger.debug(f"Preparing to create edge: Source={source_graph_node_id}, Target={target_graph_node_id}, Label='{relationship_label}', Data={edge_data}")
+                edge_data = {'similarity_score': score, 'based_on': 'summary'} # Add context
+                logger.debug(f"Preparing to create edge based on summary: Source={source_graph_node_id}, Target={target_graph_node_id}, Label='{relationship_label}', Data={edge_data}")
                 edge_schema = GraphEdgeCreate(
                     source_node_id=source_graph_node_id,
                     target_node_id=target_graph_node_id,
-                    label=relationship_label, # Use the score-based label
-                    data=edge_data # Store the raw score
+                    label=relationship_label, 
+                    data=edge_data 
                 )
                 try:
                     # Use the correct argument name 'edge' as defined in crud_graph.py
@@ -120,17 +148,21 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
                 logger.error(f"Exception preparing edge data for Source={source_graph_node_id}, Target={target_graph_node_id}: {prepare_exc}", exc_info=True)
 
         # INFO level log for summary remains
-        logger.info(f"Finished automatic edge creation for note {new_note.id}. Created {created_edge_count} new edge(s).")
+        logger.info(f"Finished automatic edge creation process for note {new_note.id}. Created {created_edge_count} new edge(s).")
 
     except Exception as e:
         logger.error(f"Error during overall automatic edge creation process for note {new_note.id}: {e}", exc_info=True)
 
 # Change function signature to async
 async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
-    """Creates a new note and its corresponding graph node within a single transaction, including tag generation."""
-    note_data = note_in.model_dump()
+    """Creates a new note and its corresponding graph node within a single transaction, including tag generation and vector upserts."""
+    logger.debug(f"create_note received data: {note_in.model_dump()}") # Log received data
+
+    note_data = note_in.model_dump(exclude_unset=True)
     position_x = note_data.get('position_x', 0.0)
     position_y = note_data.get('position_y', 0.0)
+    user_summary = note_data.get('user_summary')
+    logger.info(f"Extracted user_summary from payload for create_note: '{user_summary}'") # <-- ADD THIS LOG
 
     db_note = None
     graph_node = None
@@ -141,6 +173,7 @@ async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
         db_note = Note(
             title=note_data.get('title'),
             content=note_data.get('content'),
+            user_summary=user_summary, # Save user_summary
             position_x=position_x,
             position_y=position_y,
             user_id=user_id,
@@ -169,12 +202,42 @@ async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
         db.add(db_note) # Already added, but ensures it's in the session state
         db.add(graph_node) # Already added, but ensures it's in the session state
 
-        # 5. Commit the main transaction (Note and GraphNode creation/linking)
+        # Log before commit
+        logger.info(f"BEFORE COMMIT - db_note.user_summary: '{db_note.user_summary}' for potential note {db_note.title}")
+
+        # Commit the note first to get an ID
         db.commit()
         
-        # 6. Refresh instances to get final state from DB
+        # Log after commit, before refresh
+        logger.info(f"AFTER COMMIT / BEFORE REFRESH - db_note.id: {db_note.id}, db_note.user_summary: '{db_note.user_summary}'")
+
+        # Refresh to get the full state including defaults and generated values
         db.refresh(db_note)
-        db.refresh(graph_node)
+        # Assuming graph_node was also added and potentially needs refreshing if linked
+        if graph_node:
+            db.refresh(graph_node)
+
+        # Log after refresh
+        logger.info(f"AFTER REFRESH - db_note.id: {db_note.id}, db_note.user_summary: '{db_note.user_summary}'")
+
+        # --- Run Edge Linking *within* the main transaction block --- 
+        if db_note.user_summary: # Check the refreshed db_note object
+            try:
+                logger.info(f"Attempting to find similar note edges for Note ID: {db_note.id} based on summary: '{db_note.user_summary}'")
+                # Ensure this call has await
+                await _find_and_create_similar_note_edges(
+                    db=db, 
+                    new_note=db_note, 
+                    user_id=user_id, 
+                    threshold=SIMILARITY_THRESHOLD_SUMMARY
+                )
+            except Exception as e:
+                 logger.error(f"Error during automatic edge creation process for note {db_note.id}: {e}", exc_info=True)
+                 # Decide if this error should rollback the main transaction or just be logged
+                 # Currently, it's just logged.
+        else:
+             logger.info(f"Skipping similarity check for note {db_note.id} as db_note.user_summary is: '{db_note.user_summary}'")
+
         logger.info(f"Successfully created Note {db_note.id} and linked GraphNode {graph_node.id}")
         
         # --- Task 3.2: Auto-generate tags (AFTER successful note creation) ---
@@ -189,60 +252,48 @@ async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
         
     except Exception as e:
         logger.error(f"Error during note/graph node creation or linking: {e}", exc_info=True)
-        db.rollback() # Rollback the transaction on any error during the main block
+        db.rollback() # Rollback the entire transaction
         raise e # Re-raise the exception
 
-    # --- Task 3.3: Store Tags if Generated (AFTER successful initial commit) ---
-    # This happens even if tag generation failed (tags list will be empty)
-    # We store tags in a separate transaction block to isolate potential failures
-    if graph_node: # Ensure graph_node was created
-         try:
-             # Update the data field on the existing graph_node object
-             current_data = graph_node.data if graph_node.data else {}
-             current_data['tags'] = tags # Add/update tags key
-             graph_node.data = current_data # Reassign the updated dict
-             flag_modified(graph_node, "data") # Mark JSON field as modified for SQLAlchemy
-             
-             db.add(graph_node) # Add graph_node again to session to register the change
-             db.commit() # Commit the tag update
-             db.refresh(graph_node) # Refresh to get the latest state including tags
-             if tags:
-                 logger.info(f"Stored tags {tags} in data field for GraphNode {graph_node.id}")
-             else:
-                 logger.info(f"No tags generated or stored for GraphNode {graph_node.id}")
-                 
-         except Exception as store_tag_error:
-             logger.error(f"Failed to store tags for GraphNode {graph_node.id}: {store_tag_error}", exc_info=True)
-             db.rollback() # Rollback only the tag storage failure
-             # Note: The note itself is already created. Tag storage is best-effort.
-
-    # --- Post-Creation Async Tasks (Embedding & Edge Creation) ---
-    # These happen AFTER the main note/graphnode creation and tag storage attempt
-    if db_note and db_note.content: 
-        # 7. Upsert document to vector store (Best Effort)
+    # --- Post-Commit Background Tasks --- 
+    if db_note and graph_node:
+        # AI Tag Generation
+        tags = [] # Ensure tags is initialized
         try:
-            doc_id = f"note_{db_note.id}"
+            logger.info(f"Attempting to generate tags for note {db_note.id}...")
+            tags = await suggest_tags_for_content(db_note.content)
+            logger.info(f"Suggested tags for note {db_note.id}: {tags}")
+            try:
+                # Update tags (uses its own commit/rollback) 
+                crud_graph.update_graph_node_tags(db=db, graph_node_id=graph_node.id, tags=tags, user_id=user_id)
+                logger.info(f"Stored tags {tags} in data field for GraphNode {graph_node.id}")
+            except Exception as tag_store_e:
+                logger.error(f"Failed to store tags for GraphNode {graph_node.id}: {tag_store_e}", exc_info=True)
+                # db.rollback() # Handled within update_graph_node_tags
+        except Exception as e:
+            logger.error(f"Failed to generate AI tags for note {db_note.id}: {e}", exc_info=True)
+
+        # Vector Upsert
+        try:
+            logger.info(f"Attempting to upsert vectors for Note ID: {db_note.id}")
             metadata = {
                 "note_id": db_note.id,
                 "user_id": user_id,
                 "title": db_note.title,
-                "type": "note"
-                # Potential place to add tags to metadata if vector store supports it:
-                # "tags": tags 
+                "type": "note",
+                "tags": tags # Use tags generated above (or empty list if failed)
             }
-            upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
-            logger.info(f"Successfully submitted note {db_note.id} for embedding and upsert.")
+            upsert_document(
+                note_id=db_note.id,
+                text_content=db_note.content or "",
+                metadata=metadata,
+                summary_text=db_note.user_summary
+            )
+            logger.info(f"Successfully submitted note {db_note.id} content/summary for embedding and upsert.")
         except Exception as e:
             logger.error(f"Failed to submit note {db_note.id} for embedding/upsert: {e}", exc_info=True)
 
-        # 8. Find similar notes and create edges (Best Effort)
-        try:
-            _find_and_create_similar_note_edges(db=db, new_note=db_note, user_id=user_id)
-        except Exception as auto_edge_e:
-            logger.error(f"Failed during post-creation edge linking for note {db_note.id}: {auto_edge_e}", exc_info=True)
-
-    # Return the created note object (potentially without tags fully populated if refresh didn't happen after tag storage commit, consider returning refreshed note if needed)
-    # Let's return the potentially refreshed note
+    # Return the created note object
     if db_note:
         db.refresh(db_note) # Refresh note one last time before returning
     return db_note
@@ -264,7 +315,7 @@ def get_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
 async def update_note(
     db: Session, note_id: int, note_in: NoteUpdate, user_id: int
 ) -> Optional[Note]:
-    """Updates a specific note, handling manual tag updates and conditional AI regeneration."""
+    """Updates a specific note, handling manual tag updates, conditional AI regeneration, and dual vector upserts."""
     db_note = get_note(db, note_id=note_id, user_id=user_id)
     if not db_note:
         logger.warning(f"Update failed: Note {note_id} not found for user {user_id}.")
@@ -283,6 +334,10 @@ async def update_note(
     content_updated = (
         'content' in update_data and 
         update_data['content'] != db_note.content
+    )
+    summary_updated = (
+        'user_summary' in update_data and 
+        update_data['user_summary'] != db_note.user_summary
     )
     # Check if manual tags were provided in the input
     manual_tags_provided = 'tags' in update_data
@@ -315,7 +370,7 @@ async def update_note(
             # Apply other direct updates to Note model
             elif hasattr(db_note, key):
                 setattr(db_note, key, value)
-
+        
         # Update GraphNode related fields if graph_node exists
         if graph_node:
             # Update GraphNode position if changed
@@ -390,23 +445,39 @@ async def update_note(
             logger.error(f"Failed to generate AI tags for updated note {note_id}: {tag_error}", exc_info=True)
             # Continue without updating tags if AI generation fails
 
-    # --- Post-Update Vector Store Update (if content changed) ---
-    if content_updated and db_note and db_note.content:
+    # --- Post-Update Vector Store Update (if content or summary changed) ---
+    if (content_updated or summary_updated) and db_note:
+        logger.info(f"Content or Summary updated for note {db_note.id}. Submitting for vector update.")
         try:
-            doc_id = f"note_{db_note.id}"
-            # Determine which tags to use for metadata (prefer manual if provided, else AI)
-            tags_for_metadata = manual_tags if manual_tags_provided else ai_generated_tags
             metadata = {
                 "note_id": db_note.id,
                 "user_id": user_id,
                 "title": db_note.title,
                 "type": "note",
-                "tags": tags_for_metadata # Add tags to metadata
+                "tags": manual_tags if manual_tags_provided else ai_generated_tags # Include tags if available
             }
-            upsert_document(doc_id=doc_id, text_content=db_note.content, metadata=metadata)
-            logger.info(f"Successfully submitted updated note {db_note.id} for embedding and upsert with tags: {tags_for_metadata}.")
+            upsert_document(
+                note_id=db_note.id,
+                text_content=db_note.content or "", # Ensure content is not None
+                metadata=metadata,
+                summary_text=db_note.user_summary # Pass current summary
+            )
+            logger.info(f"Successfully submitted updated note {db_note.id} content/summary for embedding and upsert.")
         except Exception as e:
             logger.error(f"Failed to submit updated note {db_note.id} for embedding/upsert: {e}", exc_info=True)
+
+    # 8. Find similar notes and create edges (Best Effort)
+    logger.info(f"Checking for post-update edge linking for Note ID: {db_note.id}")
+    # Only run if summary was part of the update?
+    if summary_updated:
+        try:
+            logger.info(f"Summary updated, attempting post-update edge check for Note ID: {db_note.id}")
+            # ADD await here
+            await _find_and_create_similar_note_edges(db=db, new_note=db_note, user_id=user_id, threshold=SIMILARITY_THRESHOLD_SUMMARY)
+        except Exception as auto_edge_e:
+            logger.error(f"Failed during post-update edge linking for note {db_note.id}: {auto_edge_e}", exc_info=True)
+    else:
+         logger.info(f"Summary not updated, skipping post-update edge check for Note ID: {db_note.id}")
 
     # Refresh the note one last time before returning
     if db_note:
@@ -445,11 +516,11 @@ def delete_note(db: Session, note_id: int, user_id: int) -> Optional[Note]:
 
         # Delete from vector store (Best Effort)
         try:
-            doc_id = f"note_{note_id_to_delete}"
-            delete_document(doc_id)
-            logger.info(f"Successfully submitted deletion request for vector document {doc_id}.")
+            # Call the modified delete_document with the note_id
+            delete_document(note_id=note_id_to_delete)
+            logger.info(f"Successfully submitted deletion request for vectors associated with Note ID {note_id_to_delete}.")
         except Exception as e:
-            logger.error(f"Failed to submit deletion for vector document {doc_id}: {e}", exc_info=True)
+            logger.error(f"Failed during vector deletion process for Note ID {note_id_to_delete}: {e}", exc_info=True)
         
         return db_note # Return the object state just before deletion
 

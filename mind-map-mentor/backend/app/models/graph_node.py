@@ -36,6 +36,8 @@ class GraphNode(Base):
         cascade="all, delete-orphan"
     )
 
-    # Optional: Relationships back to source Note or File (Uncomment if needed)
-    # source_note = relationship("Note", back_populates="graph_node")
-    # source_file = relationship("File", back_populates="graph_node") 
+    # Relationship back to the original Note that this GraphNode represents
+    original_note = relationship("Note", back_populates="graph_node")
+
+    # Optional: Relationship back to the original File (if you have a File model)
+    # original_file = relationship("File", back_populates="graph_node") # Adjust if needed 

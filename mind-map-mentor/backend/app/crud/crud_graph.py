@@ -177,6 +177,31 @@ def update_graph_node(
          return None
     return db_node
 
+def update_graph_node_tags(
+    db: Session, graph_node_id: int, tags: List[str], user_id: int
+) -> Optional[GraphNode]:
+    """Updates the tags list within the data field of a specific graph node."""
+    db_node = get_graph_node(db, node_id=graph_node_id, user_id=user_id)
+    if not db_node:
+        logger.warning(f"Cannot update tags: GraphNode {graph_node_id} not found for user {user_id}.")
+        return None
+
+    try:
+        current_data = db_node.data if db_node.data is not None else {}
+        current_data['tags'] = tags # Add or overwrite the tags list
+        db_node.data = current_data # Assign the modified dictionary back
+        flag_modified(db_node, "data") # Mark the JSON field as modified
+        
+        db.add(db_node) # Add to session
+        db.commit() # Commit the change
+        db.refresh(db_node) # Refresh to get the latest state
+        logger.info(f"Successfully updated tags for GraphNode {graph_node_id} to {tags}")
+        return db_node
+    except Exception as e:
+        logger.error(f"Error updating tags for GraphNode {graph_node_id}: {e}", exc_info=True)
+        db.rollback()
+        return None
+
 def delete_graph_node(db: Session, node_id: int, user_id: int) -> Optional[GraphNode]:
     """Delete a graph node."""
     db_node = get_graph_node(db, node_id=node_id, user_id=user_id)

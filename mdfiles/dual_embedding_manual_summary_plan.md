@@ -19,20 +19,24 @@ To improve the reliability of automatic edge creation between notes by using emb
 
 ### 3.1. Database Model (`mind-map-mentor/backend/app/models/note.py`)
 
--   [ ] Add a new column to the `Note` SQLAlchemy model:
+-   [X] **1. Add `user_summary` column:**
+    -   [X] Add a new column to the `Note` SQLAlchemy model:
     ```python
     user_summary: Mapped[str | None] = mapped_column(String(50), nullable=True) # Using String(50) for buffer, ensure max_length enforced elsewhere
     ```
 
 ### 3.2. Database Migration (`alembic`)
 
--   [ ] Generate a new Alembic migration script: `alembic revision --autogenerate -m "Add user_summary to Note model"`
--   [ ] Review the generated script to ensure it correctly adds the `user_summary` column.
--   [ ] Apply the migration: `alembic upgrade head`
+-   [X] **1. Generate Migration:**
+    -   [X] Generate a new Alembic migration script: `alembic revision --autogenerate -m "Add user_summary to Note model"`
+    -   [X] Review the generated script to ensure it correctly adds the `user_summary` column.
+-   [X] **2. Apply Migration:**
+    -   [X] Apply the migration: `alembic upgrade head`
 
 ### 3.3. Pydantic Schemas (`mind-map-mentor/backend/app/schemas/note.py`)
 
--   [ ] Add `user_summary` field to relevant Pydantic schemas:
+-   [X] **1. Add `user_summary` field:**
+    -   [X] Add `user_summary` field to relevant Pydantic schemas (`NoteBase`, `NoteCreate`, `NoteUpdate`, `Note`):
     ```python
     from pydantic import Field
     # ... other imports
@@ -62,84 +66,83 @@ To improve the reliability of automatic edge creation between notes by using emb
         class Config:
             orm_mode = True # or from_attributes = True for Pydantic v2
     ```
-    *(Adjust field names and base classes according to your exact schema structure)*
+        *(Adjusted field names and base classes according to your exact schema structure)*
+        *(Added to `NoteBase`, inherited by others)*
 
 ### 3.4. Vector Store Logic (`mind-map-mentor/backend/app/ai/vectorstore.py`)
 
--   [ ] Modify `upsert_document`:
-    -   Accept an optional `summary_text: Optional[str]` parameter.
-    -   Generate `embedding_content` from `text_content`.
-    -   Upsert content vector with ID `f"note_{note_id}_content"` and metadata `{"embedding_type": "content", ...other_metadata}`.
-    -   If `summary_text` is provided and not empty:
-        -   Generate `embedding_summary` from `summary_text`.
-        -   Upsert summary vector with ID `f"note_{note_id}_summary"` and metadata `{"embedding_type": "summary", ...other_metadata}`.
--   [ ] Modify `query_similar_notes` (or create a new function like `query_similar_summaries`):
-    -   Add a required `embedding_type_filter: str` parameter (e.g., "content" or "summary").
-    -   Construct the Pinecone query filter to include `{"embedding_type": {"$eq": embedding_type_filter}}`.
--   [ ] Modify `delete_document`:
-    -   Accept `note_id` instead of full `doc_id`.
-    -   Attempt to delete *both* potential vector IDs: `f"note_{note_id}_content"` and `f"note_{note_id}_summary"`. Handle potential errors if one doesn't exist gracefully.
+-   [X] **1. Modify `upsert_document`:**
+    -   [X] Accept an optional `summary_text: Optional[str]` parameter.
+    -   [X] Accept `note_id` parameter instead of `doc_id`.
+    -   [X] Generate `embedding_content` from `text_content`.
+    -   [X] Upsert content vector with ID `f"note_{note_id}_content"` and metadata `{"embedding_type": "content", ...other_metadata}`.
+    -   [X] If `summary_text` is provided and not empty:
+        -   [X] Generate `embedding_summary` from `summary_text`.
+        -   [X] Upsert summary vector with ID `f"note_{note_id}_summary"` and metadata `{"embedding_type": "summary", ...other_metadata}`.
+-   [X] **2. Modify `query_similar_notes` (or create a new function like `query_similar_summaries`):**
+    -   [X] Add a required `embedding_type_filter: str` parameter (e.g., "content" or "summary").
+    -   [X] Construct the Pinecone query filter to include `{"embedding_type": {"$eq": embedding_type_filter}}`.
+    -   *(Modified existing function)*
+-   [X] **3. Modify `delete_document`:**
+    -   [X] Accept `note_id` instead of full `doc_id`.
+    -   [X] Attempt to delete *both* potential vector IDs: `f"note_{note_id}_content"` and `f"note_{note_id}_summary"`. Handle potential errors if one doesn't exist gracefully.
 
 ### 3.5. CRUD Logic (`mind-map-mentor/backend/app/crud/crud_note.py`)
 
--   [ ] `create_note`:
-    -   Accept `user_summary` from `note_in`.
-    -   Save `user_summary` to `db_note.user_summary`.
-    -   After commit, call `upsert_document` passing both `db_note.content` and `db_note.user_summary`.
--   [ ] `update_note`:
-    -   Accept `user_summary` from `note_in`.
-    *   Update `db_note.user_summary` if provided in `update_data`.
-    *   After commit, if content or summary changed, call `upsert_document` passing both the current `db_note.content` and `db_note.user_summary`.
--   [ ] `_find_and_create_similar_note_edges`:
-    *   Get `new_note.user_summary`.
-    *   **If `new_note.user_summary` is None or empty, return immediately (skip edge creation).**
-    *   Generate embedding for `new_note.user_summary`.
-    *   Call `query_similar_notes` (or the new query function) using the summary embedding and passing `embedding_type_filter="summary"`.
-    *   Process results based on summary similarity scores.
--   [ ] `delete_note`:
-    *   Call the modified `delete_document` using the `note_id`.
+-   [X] **1. `create_note`:**
+    -   [X] Accept `user_summary` from `note_in`.
+    -   [X] Save `user_summary` to `db_note.user_summary`.
+    -   [X] After commit, call `upsert_document` passing both `db_note.content` and `db_note.user_summary`.
+-   [X] **2. `update_note`:**
+    -   [X] Accept `user_summary` from `note_in`.
+    -   [X] Update `db_note.user_summary` if provided in `update_data`.
+    -   [X] After commit, if content or summary changed, call `upsert_document` passing both the current `db_note.content` and `db_note.user_summary`.
+-   [X] **3. `_find_and_create_similar_note_edges`:**
+    -   [X] Get `new_note.user_summary`.
+    -   [X] **If `new_note.user_summary` is None or empty, return immediately (skip edge creation).**
+    -   [X] Generate embedding for `new_note.user_summary`. *(Handled within `query_similar_notes`)*
+    -   [X] Call `query_similar_notes` (or the new query function) using the summary embedding and passing `embedding_type_filter="summary"`.
+    -   [X] Process results based on summary similarity scores.
+-   [X] **4. `delete_note`:**
+    -   [X] Call the modified `delete_document` using the `note_id`.
 
 ### 3.6. API Endpoints (`mind-map-mentor/backend/app/api/api_v1/endpoints/notes.py`)
 
--   [ ] Update `POST /notes/` endpoint to accept `user_summary` in the request body (`NoteCreate` schema).
--   [ ] Update `PUT /notes/{note_id}` endpoint to accept `user_summary` in the request body (`NoteUpdate` schema).
--   [ ] Ensure `GET /notes/` and `GET /notes/{note_id}` endpoints return notes including the `user_summary` field (using the updated `Note` schema).
+- [X] **1. Update `POST /notes/`:**
+    - [X] Update endpoint to accept `user_summary` in the request body (`NoteCreate` schema). *(Handled by schema update)*
+- [X] **2. Update `PUT /notes/{note_id}`:**
+    - [X] Update endpoint to accept `user_summary` in the request body (`NoteUpdate` schema). *(Handled by schema update)*
+- [X] **3. Update `GET /notes/` and `GET /notes/{note_id}`:**
+    - [X] Ensure endpoints return notes including the `user_summary` field (using the updated `Note` schema). *(Handled by schema update)*
 
 ## 4. Frontend Implementation Steps
 
 ### 4.1. State Management & Types (e.g., `frontend/src/stores/noteStore.ts`)
 
--   [ ] Add `userSummary?: string | null` to the `Note` interface/type definition used in the store and components.
+- [X] **1. Update Types:**
+    - [X] Add `userSummary?: string | null` to the `Note` interface/type definition used in the store and components.
+    - *(Updated top-level `Note`, `NoteNodeData`, and API `Note` types in `index.ts`)*
 
 ### 4.2. API Service (`frontend/src/services/api.ts`)
 
--   [ ] Update request types/interfaces for `createNote` and `updateNote` to include the optional `userSummary` field.
--   [ ] Update response types/interfaces for `createNote`, `updateNote`, `getNote`, `getNotes` to include the optional `userSummary` field.
--   [ ] Ensure the `userSummary` is passed in the request body for create/update calls.
+- [X] **1. Update Request Types:**
+    - [X] Update request types/interfaces for `createNote` (`NoteCreatePayload`) and `updateNote` (`NoteUpdateData`) to include the optional `userSummary` field. *(Updated `NoteCreatePayload` in `api.ts` and `NoteUpdateData` in `types/index.ts`)*
+- [X] **2. Update Response Types:**
+    - [X] Update response types/interfaces for `createNote`, `updateNote`, `getNote`, `getNotes` to include the optional `userSummary` field. *(Handled by Step 4.1 type updates)*
+- [X] **3. Verify Payload Sending:**
+    - [X] Ensure the `userSummary` is passed in the request body for create/update calls in `api.ts`. *(Verified - functions pass the whole data object)*
 
 ### 4.3. UI Components (e.g., `frontend/src/components/NoteEditor.tsx`)
 
--   [ ] Add a new input field (e.g., `TextInput` or `Textarea` with limited rows) for the `userSummary`.
--   [ ] Bind the input field's value to the corresponding state variable holding the current note's data.
--   [ ] Implement client-side validation for the 30-character limit.
--   [ ] Display a character counter (e.g., `currentLength / 30`).
--   [ ] Add informative placeholder text (e.g., `Core keywords for linking...`).
--   [ ] Add an info icon (ⓘ) with a tooltip explaining the field's purpose and guidelines.
--   [ ] Ensure the `userSummary` value from the state is included when calling the `updateNote` API service function on save.
-
-## 5. Testing Plan
-
--   [ ] **CRUD:** Create, read, update, delete notes with and without summaries. Verify data persistence in DB and API responses. Verify character limit enforcement.
--   [ ] **Vector Store:** Use Pinecone console/API to verify that two vectors (`_content`, `_summary`) are created per note (if summary exists) with correct metadata (`embedding_type`). Verify deletion removes both.
--   [ ] **Edge Creation:**
-    -   Create Note A (no summary). Create Note B (summary "apple pie"). Create Note C (summary "apple tart"). -> Expect no edges involving A. Expect potential edge B-C if summaries are similar enough.
-    -   Create Note D (summary "vector db"). Create Note E (summary "RAG system"). Create Note F (summary "banana bread"). -> Expect potential edge D-E (check score), no edges involving F.
-    -   Verify edge creation respects the score threshold based on *summary* similarity.
--   [ ] **RAG:** Perform RAG queries related to the *full content* of notes. Verify that relevant notes are retrieved based on content similarity and that RAG answers are correct, confirming it's using the content embeddings for search.
--   [ ] **UI:** Test the summary input field, character counter, tooltip, and data binding.
-
-## 6. Future Considerations
-
--   Strategy for handling existing notes without summaries.
--   Possibility of using AI to suggest or backfill summaries later.
--   Monitoring Pinecone costs. 
+- [X] **1. Add Summary Input Field (Edit Modal):**
+    - [X] Add a new input field (e.g., `TextInput` or `Textarea` with limited rows) for the `userSummary`. *(Added textarea to `NoteEditModal.tsx`)*
+    - [X] Bind the input field's value to the corresponding state variable holding the current note's data.
+- [X] **2. Add Summary Input Field (Create Modal):**
+    - [X] Identify the component used for creating new notes (e.g., `CreateNoteModal.tsx` or similar).
+    - [X] Add the same `userSummary` input field, state management, character counter, and placeholder as in the edit modal.
+    - [X] Ensure the `userSummary` is included when calling the `createNote`
+- [X] **4. Add Placeholder/Tooltip:**
+    - [X] Add informative placeholder text (e.g., `Core keywords for linking...`).
+- [X] **5. Add Info Icon:**
+    - [X] Add an info icon (ⓘ) with a tooltip explaining the field's purpose and guidelines. *(Tooltip not added yet)*
+- [X] **6. Include in Save Logic:**

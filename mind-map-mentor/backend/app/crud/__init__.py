@@ -11,6 +11,7 @@ from .crud_file import (
 # Import generic graph CRUD functions
 from .crud_graph import (
     get_graph_node, get_graph_nodes_for_user, create_graph_node, update_graph_node, delete_graph_node,
-    get_graph_edge, get_graph_edges_for_user, create_graph_edge, update_graph_edge, delete_graph_edge
+    get_graph_edge, get_graph_edges_for_user, create_graph_edge, update_graph_edge, delete_graph_edge,
+    update_graph_node_tags
 )
 # Add imports for file and graph CRUD later when implemented 

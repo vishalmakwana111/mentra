@@ -12,6 +12,7 @@ export interface Note {
   user_id: number;
   title: string | null;
   content: string | null;
+  userSummary?: string | null; // Added user summary
   position_x?: number | null; // Optional position x
   position_y?: number | null; // Optional position y
   created_at: string; // Or Date
@@ -32,12 +33,14 @@ export interface ApiFile {
 export interface NoteCreateData {
   title: string; // Title is required for creation
   content?: string | null; // Content is optional
+  userSummary?: string | null; // Add user summary
 }
 
 // Data allowed when updating a note
 export interface NoteUpdateData {
   title?: string | null; // Title is optional for update
   content?: string | null; // Content is optional
+  userSummary?: string | null; // Add user summary
   position_x?: number | null; // Position is optional for update
   position_y?: number | null; // Position is optional for update
 }
@@ -58,12 +61,15 @@ interface BaseGraphNodeData {
 interface NoteNodeData extends BaseGraphNodeData {
     type: 'note';
     content: string | null;
+    userSummary?: string | null; // Added user summary
     tags?: string[] | null; // Add optional tags field
     // Include other relevant note fields if needed for display/interaction
     created_at: string;
     updated_at: string | null;
     // You might want to include the original Note object for reference
-    // originalNote: Note; 
+    original_note_id: number;
+    position_x?: number | null; 
+    position_y?: number | null;
 }
 
 // Specific data for a file node
@@ -128,6 +134,7 @@ export interface Note {
   user_id: number;
   title: string;
   content: string | null; // Keep null possible if backend allows, but make required for creation
+  userSummary?: string | null; // Added user summary
   position_x?: number | null;
   position_y?: number | null;
   graph_node_id?: number | null;
@@ -173,6 +180,7 @@ export interface GraphEdge {
 export interface NoteCreateData {
   title: string;
   content: string; // Content is required now
+  userSummary?: string | null; // Add user summary
   position_x?: number;
   position_y?: number;
 }
@@ -180,6 +188,7 @@ export interface NoteCreateData {
 export interface NoteUpdateData {
   title?: string;
   content?: string;
+  userSummary?: string | null; // Add user summary
   position_x?: number;
   position_y?: number;
 }

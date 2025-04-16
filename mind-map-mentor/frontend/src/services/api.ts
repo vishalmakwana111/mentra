@@ -136,7 +136,10 @@ export const fetchNotes = async (skip: number = 0, limit: number = 100): Promise
 // Create a new Note
 interface NoteCreatePayload {
   title: string;
-  content?: string | null; // Match backend schema
+  content: string; // Make content required
+  userSummary?: string | null; // Add user summary (matches backend)
+  position_x?: number;
+  position_y?: number;
 }
 
 export const createNote = async (noteData: NoteCreatePayload): Promise<Note> => {

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     # AI Feature Settings
     SIMILARITY_THRESHOLD: float = 0.5# Default threshold for auto-edges
+    SIMILARITY_THRESHOLD_SUMMARY: float = 0.5 # Default threshold for summary-based edges
+    SIMILARITY_THRESHOLD_CONTENT: float = 0.5 # Default threshold for content-based edges (if implemented)
 
     # Add other application settings here as needed
     # e.g., OPENAI_API_KEY: str | None = None
