@@ -12,7 +12,7 @@ Agile project management prioritizes iterative development, feedback, and adapti
 
 ## Paragraph 2: CI/CD Pipelines (Shortened)
 
-CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.
+**CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.**
 
 ---
 

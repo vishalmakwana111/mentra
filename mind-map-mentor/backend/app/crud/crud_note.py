@@ -19,6 +19,7 @@ from app.ai.vectorstore import query_similar_notes # Need this for similarity se
 from app.ai.agents.organizer import suggest_tags_for_content # Task 3.1 Import
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG) # Explicitly set level for this logger
 
 # --- Task 1: Helper Function for Score-Based Labels ---
 def get_relationship_label_from_score(score: float) -> str:
@@ -40,30 +41,35 @@ def get_relationship_label_from_score(score: float) -> str:
 
 def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: int):
     """Finds similar notes and creates edges if they meet the threshold."""
-    logger.debug("Entering _find_and_create_similar_note_edges...")
+    logger.debug(f"Entering _find_and_create_similar_note_edges for new Note ID: {new_note.id}...")
     if not new_note.content or new_note.graph_node_id is None:
         logger.warning(f"Skipping edge creation for note {new_note.id}: Missing content or graph_node_id.")
         return
 
-    logger.info(f"Finding similar notes for newly created note {new_note.id} for user {user_id}...")
+    logger.info(f"Finding similar notes for newly created note {new_note.id} (GraphNode ID: {new_note.graph_node_id}) for user {user_id}...")
     try:
         # Pass user_id to query_similar_notes for filtering
-        similar_results = query_similar_notes(query_text=new_note.content, user_id=user_id, top_k=6) 
-        logger.debug(f"Raw similar_results from query: {similar_results}")
+        similar_results = query_similar_notes(query_text=new_note.content, user_id=user_id, top_k=6)
+        logger.debug(f"Raw similar_results from query (count: {len(similar_results)}): {similar_results}")
         
         created_edge_count = 0
-        for result in similar_results:
+        if not similar_results:
+             logger.debug("No similar results found.")
+             
+        for i, result in enumerate(similar_results):
+            logger.debug(f"--- Processing similarity result {i+1}/{len(similar_results)} ---: {result}")
             score = result.get('score')
             metadata = result.get('metadata', {})
             similar_note_id = metadata.get('note_id')
 
             # Validate result
             if score is None or similar_note_id is None:
-                logger.warning(f"Skipping invalid search result: {result}")
+                logger.warning(f"Skipping invalid search result (missing score or note_id): {result}")
                 continue
             
             # Don't link to self
             if similar_note_id == new_note.id:
+                logger.debug(f"Skipping result {i+1}: Same note ID ({similar_note_id}).")
                 continue
                 
             # Log the score for every potential match before threshold check
@@ -71,14 +77,16 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
 
             # Check threshold
             if score < settings.SIMILARITY_THRESHOLD:
-                logger.debug(f"Skipping edge creation for note {similar_note_id} (score below threshold)")
+                logger.debug(f"Skipping result {i+1}: Score {score:.4f} is below threshold {settings.SIMILARITY_THRESHOLD} for Note {similar_note_id}.")
                 continue
 
             # Get the graph_node_id for the similar note
+            logger.debug(f"Attempting to fetch details for similar Note ID: {similar_note_id}...")
             similar_note = get_note(db, note_id=similar_note_id, user_id=user_id)
             if not similar_note or similar_note.graph_node_id is None:
-                logger.warning(f"Could not find valid similar note or its graph node (Note ID: {similar_note_id})")
+                logger.warning(f"Skipping result {i+1}: Could not find valid similar note or its graph node in DB (Note ID: {similar_note_id})")
                 continue
+            logger.debug(f"Found similar Note {similar_note_id} with GraphNode ID: {similar_note.graph_node_id}")
             
             target_graph_node_id = similar_note.graph_node_id
             source_graph_node_id = new_note.graph_node_id # From the new note
@@ -89,6 +97,7 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
             try:
                 relationship_label = get_relationship_label_from_score(score)
                 edge_data = {'similarity_score': score}
+                logger.debug(f"Preparing to create edge: Source={source_graph_node_id}, Target={target_graph_node_id}, Label='{relationship_label}', Data={edge_data}")
                 edge_schema = GraphEdgeCreate(
                     source_node_id=source_graph_node_id,
                     target_node_id=target_graph_node_id,
@@ -99,19 +108,22 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
                     # Use the correct argument name 'edge' as defined in crud_graph.py
                     created_edge = crud_graph.create_graph_edge(db=db, edge=edge_schema, user_id=user_id)
                     if created_edge:
+                        # INFO level log for successful creation remains
                         logger.info(f"Created edge between graph nodes {source_graph_node_id} and {target_graph_node_id} with label \"{relationship_label}\" (Similarity: {score:.2f})")
                         created_edge_count += 1
                     else:
-                        logger.warning(f"Edge between {source_graph_node_id} and {target_graph_node_id} might already exist or failed creation silently.")
-                except Exception as e:
-                    logger.error(f"Failed to create edge between {source_graph_node_id} and {target_graph_node_id}: {e}", exc_info=True)
-            except Exception as e:
-                logger.error(f"Failed to create edge between {source_graph_node_id} and {target_graph_node_id}: {e}", exc_info=True)
+                        # This case might indicate an edge already exists or other silent failure in create_graph_edge
+                        logger.warning(f"crud_graph.create_graph_edge returned None for Source={source_graph_node_id}, Target={target_graph_node_id}. Edge might already exist or creation failed.")
+                except Exception as create_exc:
+                    logger.error(f"Exception during crud_graph.create_graph_edge call for Source={source_graph_node_id}, Target={target_graph_node_id}: {create_exc}", exc_info=True)
+            except Exception as prepare_exc:
+                logger.error(f"Exception preparing edge data for Source={source_graph_node_id}, Target={target_graph_node_id}: {prepare_exc}", exc_info=True)
 
+        # INFO level log for summary remains
         logger.info(f"Finished automatic edge creation for note {new_note.id}. Created {created_edge_count} new edge(s).")
 
     except Exception as e:
-        logger.error(f"Error during automatic edge creation for note {new_note.id}: {e}")
+        logger.error(f"Error during overall automatic edge creation process for note {new_note.id}: {e}", exc_info=True)
 
 # Change function signature to async
 async def create_note(db: Session, note_in: NoteCreate, user_id: int) -> Note:
