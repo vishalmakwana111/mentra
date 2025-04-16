@@ -30,4 +30,4 @@ Microservices structure applications as collections of small, independent, loose
 
 ## Paragraph 5: Retrieval-Augmented Generation (RAG) (Shortened)
 
-**Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks.**
+Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks.

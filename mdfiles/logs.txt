@@ -1,76 +1,71 @@
-NFO:     127.0.0.1:54148 - "GET /api/v1/graph/edges?skip=0&limit=1000 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54164 - "OPTIONS /api/v1/notes/16 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54701 - "GET /api/v1/graph/edges?skip=0&limit=1000 HTTP/1.1" 200 OK
+INFO:app.crud.crud_note:Successfully created Note 22 and linked GraphNode 22
+INFO:app.crud.crud_note:Attempting to generate tags for note 22...
+INFO:app.ai.agents.organizer:Suggesting tags for content (truncated): Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. I...
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.ai.agents.organizer:Raw LLM Output for tags: retrieval-augmented generation, llm, external knowledge, vector database, hallucinations
+INFO:app.ai.agents.organizer:Parsed tags: ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations']
+INFO:app.crud.crud_note:Suggested tags for note 22: ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations']
+INFO:app.crud.crud_note:Stored tags ['retrieval-augmented generation', 'llm', 'external knowledge', 'vector database', 'hallucinations'] in data field for GraphNode 22
+INFO:app.ai.vectorstore:Attempting to upsert document with ID: note_22
+WARNING:app.ai.vectorstore:Pinecone vector store accessed before initialization. Initializing now.
+INFO:app.ai.vectorstore:Initializing Pinecone connection...
+INFO:app.ai.vectorstore:Successfully connected to Pinecone index 'mentra'.
+INFO:app.ai.vectorstore:Initializing embedding function...
+WARNING:app.ai.embeddings:OpenAI embedding function accessed before initialization. Initializing now.
+INFO:app.ai.embeddings:Initialized OpenAI Embedding function with model: text-embedding-3-small
+INFO:app.ai.vectorstore:Embedding function initialized.
+INFO:app.ai.vectorstore:PineconeVectorStore initialized successfully.
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+INFO:app.ai.vectorstore:Successfully upserted document note_22 via PineconeVectorStore.
+INFO:app.crud.crud_note:Successfully submitted note 22 for embedding and upsert.
+DEBUG:app.crud.crud_note:Entering _find_and_create_similar_note_edges for new Note ID: 22...
+INFO:app.crud.crud_note:Finding similar notes for newly created note 22 (GraphNode ID: 22) for user 2...
+INFO:app.ai.vectorstore:Attempting vector search for query: 'Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks.', user_id: 2, top_k=6, filter={'user_id': 2}
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+DEBUG:app.crud.crud_note:Raw similar_results from query (count: 6): [{'id': 'note_16', 'score': 0.999972403, 'metadata': {'note_id': 16, 'title': 'Retrieval-Augmented Generation', 'type': 'note', 'user_id': 2}, 'page_content': "Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks."}, {'id': 'note_14', 'score': 0.999972105, 'metadata': {'note_id': 14, 'title': 'Retrieval-Augmented Generation', 'type': 'note', 'user_id': 2}, 'page_content': "Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks."}, {'id': 'note_20', 'score': 0.312983811, 'metadata': {'note_id': 20, 'title': 'ntroduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}, {'id': 'note_17', 'score': 0.312983811, 'metadata': {'note_id': 17, 'title': 'Introduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}, {'id': 'note_13', 'score': 0.312896, 'metadata': {'note_id': 13, 'title': 'Introduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}, {'id': 'note_15', 'score': 0.223832697, 'metadata': {'note_id': 15, 'title': 'vector database', 'type': 'note', 'user_id': 2}, 'page_content': 'vector database'}]
+DEBUG:app.crud.crud_note:--- Processing similarity result 1/6 ---: {'id': 'note_16', 'score': 0.999972403, 'metadata': {'note_id': 16, 'title': 'Retrieval-Augmented Generation', 'type': 'note', 'user_id': 2}, 'page_content': "Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks."}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 16 | Score: 1.0000
+DEBUG:app.crud.crud_note:Attempting to fetch details for similar Note ID: 16...
+DEBUG:app.crud.crud_note:Found similar Note 16 with GraphNode ID: 16
+DEBUG:app.crud.crud_note:Preparing to create edge: Source=22, Target=16, Label='Strongly Related', Data={'similarity_score': 0.999972403}
+[create_graph_edge] Checking source node: ID=22, User=2
+[get_graph_node] Querying for Node ID=22, User ID=2
+[get_graph_node] Result for Node ID=22: Found
+[create_graph_edge] Checking target node: ID=16, User=2
 [get_graph_node] Querying for Node ID=16, User ID=2
 [get_graph_node] Result for Node ID=16: Found
-INFO:app.crud.crud_note:Updating note 16...
-INFO:app.crud.crud_note:Updating GraphNode 16 position to {'x': -910.0835131868762, 'y': -538.5014052785345}
-INFO:app.crud.crud_note:Successfully committed main updates for Note 16 and GraphNode 16.
-INFO:     127.0.0.1:54164 - "PUT /api/v1/notes/16 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54164 - "OPTIONS /api/v1/notes/19 HTTP/1.1" 200 OK
-[get_graph_node] Querying for Node ID=19, User ID=2
-[get_graph_node] Result for Node ID=19: Found
-INFO:app.crud.crud_note:Updating note 19...
-INFO:app.crud.crud_note:Updating GraphNode 19 position to {'x': -390.0, 'y': 72.0}
-INFO:app.crud.crud_note:Successfully committed main updates for Note 19 and GraphNode 19.
-INFO:     127.0.0.1:54164 - "PUT /api/v1/notes/19 HTTP/1.1" 200 OK
-INFO:app.crud.crud_note:Successfully created Note 21 and linked GraphNode 21
-INFO:app.crud.crud_note:Attempting to generate tags for note 21...
-INFO:app.ai.agents.organizer:Suggesting tags for content (truncated): CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab C...
-INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-INFO:app.ai.agents.organizer:Raw LLM Output for tags: ci/cd, devops, automation, continuous integration, continuous deployment
-INFO:app.ai.agents.organizer:Parsed tags: ['ci/cd', 'devops', 'automation', 'continuous integration', 'continuous deployment']
-INFO:app.crud.crud_note:Suggested tags for note 21: ['ci/cd', 'devops', 'automation', 'continuous integration', 'continuous deployment']
-INFO:app.crud.crud_note:Stored tags ['ci/cd', 'devops', 'automation', 'continuous integration', 'continuous deployment'] in data field for GraphNode 21
-INFO:app.ai.vectorstore:Attempting to upsert document with ID: note_21
-INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-INFO:app.ai.vectorstore:Successfully upserted document note_21 via PineconeVectorStore.
-INFO:app.crud.crud_note:Successfully submitted note 21 for embedding and upsert.
-DEBUG:app.crud.crud_note:Entering _find_and_create_similar_note_edges for new Note ID: 21...
-INFO:app.crud.crud_note:Finding similar notes for newly created note 21 (GraphNode ID: 21) for user 2...
-INFO:app.ai.vectorstore:Attempting vector search for query: 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.', user_id: 2, top_k=6, filter={'user_id': 2}
-INFO:httpx:HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-DEBUG:app.crud.crud_note:Raw similar_results from query (count: 6): [{'id': 'note_21', 'score': 1.00000012, 'metadata': {'note_id': 21, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}, {'id': 'note_19', 'score': 0.999974787, 'metadata': {'note_id': 19, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}, {'id': 'note_11', 'score': 0.999974787, 'metadata': {'note_id': 11, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}, {'id': 'note_18', 'score': 0.372994483, 'metadata': {'note_id': 18, 'title': 'Agile Project Management', 'type': 'note', 'user_id': 2}, 'page_content': 'Agile project management prioritizes iterative development, feedback, and adaptive planning over traditional waterfall methods. It values customer collaboration, working software, individual interactions, and responding to change. Frameworks like Scrum and Kanban use practices like daily stand-ups, sprints, and retrospectives to improve transparency and deliver value quickly, relying on empowered, cross-functional teams.'}, {'id': 'note_10', 'score': 0.372994483, 'metadata': {'note_id': 10, 'title': 'Agile Project Management', 'type': 'note', 'user_id': 2}, 'page_content': 'Agile project management prioritizes iterative development, feedback, and adaptive planning over traditional waterfall methods. It values customer collaboration, working software, individual interactions, and responding to change. Frameworks like Scrum and Kanban use practices like daily stand-ups, sprints, and retrospectives to improve transparency and deliver value quickly, relying on empowered, cross-functional teams.'}, {'id': 'note_26', 'score': 0.305293411, 'metadata': {'note_id': 26, 'title': 'Cloud Computing Basics', 'type': 'note', 'user_id': 2}, 'page_content': 'Cloud computing provides on-demand availability of computer system resources, especially data storage and computing power, without direct active management by the user. Major providers include AWS, Azure, and Google Cloud.'}]
-DEBUG:app.crud.crud_note:--- Processing similarity result 1/6 ---: {'id': 'note_21', 'score': 1.00000012, 'metadata': {'note_id': 21, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}
-DEBUG:app.crud.crud_note:Skipping result 1: Same note ID (21).
-DEBUG:app.crud.crud_note:--- Processing similarity result 2/6 ---: {'id': 'note_19', 'score': 0.999974787, 'metadata': {'note_id': 19, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}
-DEBUG:app.crud.crud_note:Similarity check: Note 21 -> Note 19 | Score: 1.0000
-DEBUG:app.crud.crud_note:Attempting to fetch details for similar Note ID: 19...
-DEBUG:app.crud.crud_note:Found similar Note 19 with GraphNode ID: 19
-DEBUG:app.crud.crud_note:Preparing to create edge: Source=21, Target=19, Label='Strongly Related', Data={'similarity_score': 0.999974787}
-[create_graph_edge] Checking source node: ID=21, User=2
-[get_graph_node] Querying for Node ID=21, User ID=2
-[get_graph_node] Result for Node ID=21: Found
-[create_graph_edge] Checking target node: ID=19, User=2
-[get_graph_node] Querying for Node ID=19, User ID=2
-[get_graph_node] Result for Node ID=19: Found
 [create_graph_edge] Both nodes found. Creating edge...
-[create_graph_edge] Edge created successfully: ID=29
-INFO:app.crud.crud_note:Created edge between graph nodes 21 and 19 with label "Strongly Related" (Similarity: 1.00)
-DEBUG:app.crud.crud_note:--- Processing similarity result 3/6 ---: {'id': 'note_11', 'score': 0.999974787, 'metadata': {'note_id': 11, 'title': 'CI/CD Pipelines', 'type': 'note', 'user_id': 2}, 'page_content': 'CI/CD pipelines automate software build, test, and deployment using tools like Git, Jenkins/GitLab CI, and testing frameworks. Continuous Integration involves frequent code merging with automated tests to catch errors early. Continuous Deployment automatically deploys validated code to production. This DevOps practice reduces manual effort, minimizes deployment risk, and enables faster delivery of features and fixes.'}
-DEBUG:app.crud.crud_note:Similarity check: Note 21 -> Note 11 | Score: 1.0000
-DEBUG:app.crud.crud_note:Attempting to fetch details for similar Note ID: 11...
-DEBUG:app.crud.crud_note:Found similar Note 11 with GraphNode ID: 11
-DEBUG:app.crud.crud_note:Preparing to create edge: Source=21, Target=11, Label='Strongly Related', Data={'similarity_score': 0.999974787}
-[create_graph_edge] Checking source node: ID=21, User=2
-[get_graph_node] Querying for Node ID=21, User ID=2
-[get_graph_node] Result for Node ID=21: Found
-[create_graph_edge] Checking target node: ID=11, User=2
-[get_graph_node] Querying for Node ID=11, User ID=2
-[get_graph_node] Result for Node ID=11: Found
+[create_graph_edge] Edge created successfully: ID=31
+INFO:app.crud.crud_note:Created edge between graph nodes 22 and 16 with label "Strongly Related" (Similarity: 1.00)
+DEBUG:app.crud.crud_note:--- Processing similarity result 2/6 ---: {'id': 'note_14', 'score': 0.999972105, 'metadata': {'note_id': 14, 'title': 'Retrieval-Augmented Generation', 'type': 'note', 'user_id': 2}, 'page_content': "Retrieval-Augmented Generation (RAG) improves LLM answers by grounding them in external knowledge. It retrieves relevant data snippets (e.g., from a vector database) based on the user query, adds this context to the prompt, and instructs the LLM to use it. This reduces hallucinations and allows answers based on information beyond the LLM's training data, enhancing reliability for knowledge tasks."}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 14 | Score: 1.0000
+DEBUG:app.crud.crud_note:Attempting to fetch details for similar Note ID: 14...
+DEBUG:app.crud.crud_note:Found similar Note 14 with GraphNode ID: 14
+DEBUG:app.crud.crud_note:Preparing to create edge: Source=22, Target=14, Label='Strongly Related', Data={'similarity_score': 0.999972105}
+[create_graph_edge] Checking source node: ID=22, User=2
+[get_graph_node] Querying for Node ID=22, User ID=2
+[get_graph_node] Result for Node ID=22: Found
+[create_graph_edge] Checking target node: ID=14, User=2
+[get_graph_node] Querying for Node ID=14, User ID=2
+[get_graph_node] Result for Node ID=14: Found
 [create_graph_edge] Both nodes found. Creating edge...
-[create_graph_edge] Edge created successfully: ID=30
-INFO:app.crud.crud_note:Created edge between graph nodes 21 and 11 with label "Strongly Related" (Similarity: 1.00)
-DEBUG:app.crud.crud_note:--- Processing similarity result 4/6 ---: {'id': 'note_18', 'score': 0.372994483, 'metadata': {'note_id': 18, 'title': 'Agile Project Management', 'type': 'note', 'user_id': 2}, 'page_content': 'Agile project management prioritizes iterative development, feedback, and adaptive planning over traditional waterfall methods. It values customer collaboration, working software, individual interactions, and responding to change. Frameworks like Scrum and Kanban use practices like daily stand-ups, sprints, and retrospectives to improve transparency and deliver value quickly, relying on empowered, cross-functional teams.'}
-DEBUG:app.crud.crud_note:Similarity check: Note 21 -> Note 18 | Score: 0.3730
-DEBUG:app.crud.crud_note:Skipping result 4: Score 0.3730 is below threshold 0.5 for Note 18.
-DEBUG:app.crud.crud_note:--- Processing similarity result 5/6 ---: {'id': 'note_10', 'score': 0.372994483, 'metadata': {'note_id': 10, 'title': 'Agile Project Management', 'type': 'note', 'user_id': 2}, 'page_content': 'Agile project management prioritizes iterative development, feedback, and adaptive planning over traditional waterfall methods. It values customer collaboration, working software, individual interactions, and responding to change. Frameworks like Scrum and Kanban use practices like daily stand-ups, sprints, and retrospectives to improve transparency and deliver value quickly, relying on empowered, cross-functional teams.'}
-DEBUG:app.crud.crud_note:Similarity check: Note 21 -> Note 10 | Score: 0.3730
-DEBUG:app.crud.crud_note:Skipping result 5: Score 0.3730 is below threshold 0.5 for Note 10.
-DEBUG:app.crud.crud_note:--- Processing similarity result 6/6 ---: {'id': 'note_26', 'score': 0.305293411, 'metadata': {'note_id': 26, 'title': 'Cloud Computing Basics', 'type': 'note', 'user_id': 2}, 'page_content': 'Cloud computing provides on-demand availability of computer system resources, especially data storage and computing power, without direct active management by the user. Major providers include AWS, Azure, and Google Cloud.'}
-DEBUG:app.crud.crud_note:Similarity check: Note 21 -> Note 26 | Score: 0.3053
-DEBUG:app.crud.crud_note:Skipping result 6: Score 0.3053 is below threshold 0.5 for Note 26.
-INFO:app.crud.crud_note:Finished automatic edge creation for note 21. Created 2 new edge(s).
-INFO:     127.0.0.1:54168 - "POST /api/v1/notes/ HTTP/1.1" 201 Created
-INFO:     127.0.0.1:54168 - "GET /api/v1/graph/nodes/?skip=0&limit=1000 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54168 - "GET /api/v1/graph/edges/?skip=0&limit=1000 HTTP/1.1" 307 Temporary Redirect
-INFO:     127.0.0.1:54168 - "GET /api/v1/graph/edges?skip=0&limit=1000 HTTP/1.1" 200 OK
+[create_graph_edge] Edge created successfully: ID=32
+INFO:app.crud.crud_note:Created edge between graph nodes 22 and 14 with label "Strongly Related" (Similarity: 1.00)
+DEBUG:app.crud.crud_note:--- Processing similarity result 3/6 ---: {'id': 'note_20', 'score': 0.312983811, 'metadata': {'note_id': 20, 'title': 'ntroduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 20 | Score: 0.3130
+DEBUG:app.crud.crud_note:Skipping result 3: Score 0.3130 is below threshold 0.5 for Note 20.
+DEBUG:app.crud.crud_note:--- Processing similarity result 4/6 ---: {'id': 'note_17', 'score': 0.312983811, 'metadata': {'note_id': 17, 'title': 'Introduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 17 | Score: 0.3130
+DEBUG:app.crud.crud_note:Skipping result 4: Score 0.3130 is below threshold 0.5 for Note 17.
+DEBUG:app.crud.crud_note:--- Processing similarity result 5/6 ---: {'id': 'note_13', 'score': 0.312896, 'metadata': {'note_id': 13, 'title': 'Introduction to Vector Databases', 'type': 'note', 'user_id': 2}, 'page_content': 'Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.'}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 13 | Score: 0.3129
+DEBUG:app.crud.crud_note:Skipping result 5: Score 0.3129 is below threshold 0.5 for Note 13.
+DEBUG:app.crud.crud_note:--- Processing similarity result 6/6 ---: {'id': 'note_15', 'score': 0.223832697, 'metadata': {'note_id': 15, 'title': 'vector database', 'type': 'note', 'user_id': 2}, 'page_content': 'vector database'}
+DEBUG:app.crud.crud_note:Similarity check: Note 22 -> Note 15 | Score: 0.2238
+DEBUG:app.crud.crud_note:Skipping result 6: Score 0.2238 is below threshold 0.5 for Note 15.
+INFO:app.crud.crud_note:Finished automatic edge creation for note 22. Created 2 new edge(s).
+INFO:     127.0.0.1:54731 - "POST /api/v1/notes/ HTTP/1.1" 201 Created
+INFO:     127.0.0.1:54731 - "GET /api/v1/graph/nodes/?skip=0&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/v1/graph/edges/?skip=0&limit=1000 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:54731 - "GET /api/v1/graph/edges?skip=0&limit=1000 HTTP/1.1" 200 OK
