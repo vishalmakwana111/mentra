@@ -24,7 +24,7 @@ Microservices structure applications as collections of small, independent, loose
 
 ## Paragraph 4: Introduction to Vector Databases (Shortened)
 
-Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.
+**Vector databases store and query high-dimensional vector embeddings from ML models (representing text, images, etc.). Unlike keyword search, they use Approximate Nearest Neighbor (ANN) algorithms for semantic similarity searches. This powers AI applications like recommendations and anomaly detection. Key factors include index speed, query latency, scalability, and integration. Pinecone and Weaviate are examples.**
 
 ---
 
