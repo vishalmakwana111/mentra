@@ -40,6 +40,7 @@ def get_relationship_label_from_score(score: float) -> str:
 
 def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: int):
     """Finds similar notes and creates edges if they meet the threshold."""
+    logger.debug("Entering _find_and_create_similar_note_edges...")
     if not new_note.content or new_note.graph_node_id is None:
         logger.warning(f"Skipping edge creation for note {new_note.id}: Missing content or graph_node_id.")
         return
@@ -48,6 +49,7 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
     try:
         # Pass user_id to query_similar_notes for filtering
         similar_results = query_similar_notes(query_text=new_note.content, user_id=user_id, top_k=6) 
+        logger.debug(f"Raw similar_results from query: {similar_results}")
         
         created_edge_count = 0
         for result in similar_results:
