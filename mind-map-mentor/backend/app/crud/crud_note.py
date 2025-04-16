@@ -63,10 +63,13 @@ def _find_and_create_similar_note_edges(db: Session, new_note: Note, user_id: in
             # Don't link to self
             if similar_note_id == new_note.id:
                 continue
+                
+            # Log the score for every potential match before threshold check
+            logger.debug(f"Similarity check: Note {new_note.id} -> Note {similar_note_id} | Score: {score:.4f}")
 
             # Check threshold
             if score < settings.SIMILARITY_THRESHOLD:
-                logger.debug(f"Skipping note {similar_note_id} (score {score:.4f} < {settings.SIMILARITY_THRESHOLD})")
+                logger.debug(f"Skipping edge creation for note {similar_note_id} (score below threshold)")
                 continue
 
             # Get the graph_node_id for the similar note
