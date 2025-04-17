@@ -42,18 +42,29 @@ async def generate_rag_answer(query: str, user_id: int) -> Dict[str, Any]:
     logger.info(f"Starting RAG generation for user {user_id}, query: '{query[:50]}...'")
 
     try:
-        # 1. Retrieve relevant documents
-        retrieved_docs = query_similar_notes(query_text=query, user_id=user_id, top_k=4)
-        logger.debug(f"Retrieved documents raw structure: {retrieved_docs}")
-
-        if not retrieved_docs:
-            logger.warning(f"No relevant documents found for user {user_id}, query: '{query[:50]}...'")
-            return {
-                "answer": "I couldn't find any relevant information in your notes to answer that question.",
-                "sources": []
-            }
-
-        logger.info(f"Retrieved {len(retrieved_docs)} documents for RAG.")
+        # 1. Retrieve relevant documents from vector store
+        try:
+            logger.info(f"Performing vector search for RAG query: '{query}' for user {user_id}")
+            retrieved_docs = query_similar_notes(
+                query_text=query, 
+                user_id=user_id, 
+                top_k=4, # Retrieve top 4 relevant notes
+                embedding_type_filter='content' # Filter by content embeddings
+            )
+            logger.info(f"Retrieved {len(retrieved_docs)} documents for RAG context.")
+            if not retrieved_docs:
+                # Handle case with no retrieved documents - maybe return a default message
+                logger.warning(f"No relevant documents found for RAG query: '{query}'")
+                # Consider returning a message like "I couldn't find relevant notes..."
+                # For now, continue with empty context which might lead to generic answer
+                # return "I couldn't find any notes in your knowledge base related to that query."
+                pass # Let the LLM try with no context
+            
+        except Exception as e:
+            logger.error(f"Error retrieving documents from vector store: {e}", exc_info=True)
+            # Handle retrieval error gracefully
+            # Maybe return an error message to the user
+            raise HTTPException(status_code=500, detail="Error retrieving information from knowledge base.")
 
         # 2. Define RAG Prompt Template (Improved Instructions)
         template = """
