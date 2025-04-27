@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Note } from '@/types';
-import { fetchNotes } from '@/services/api'; // Import fetchNotes service
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'; // Icons for pagination
+import { fetchNotes, deleteNote, updateNote } from '@/services/api'; // Import fetchNotes, deleteNote, and updateNote services
+import { FiChevronLeft, FiChevronRight, FiEdit, FiTrash2 } from 'react-icons/fi'; // Icons for pagination + edit/delete
 import toast from 'react-hot-toast';
 import { useGraphStore } from '@/store/graphStore'; // Import graph store
+import NoteEditModal from '@/components/modals/NoteEditModal'; // Import NoteEditModal component
 
 const ITEMS_PER_PAGE = 10; // Define how many notes per page
 
@@ -15,6 +16,9 @@ export default function AllNotesPage() {
   const [totalNotes, setTotalNotes] = useState(0); // Need total count for pagination
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // State for Edit Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
   // Get timestamp from store
   const lastNoteCreatedTimestamp = useGraphStore((state) => state.lastNoteCreatedTimestamp);
 
@@ -33,10 +37,16 @@ export default function AllNotesPage() {
       setNotes(response.items);
       setTotalNotes(response.total); // Use total from response
 
-    } catch (err: any) {
+      // Adjust currentPage if deletion made the current page empty and it's not page 1
+      if (response.items.length === 0 && page > 1) {
+        setCurrentPage(page - 1); // Go back one page
+      }
+
+    } catch (err) {
       console.error("Failed to load notes:", err);
-      setError(err.message || 'Failed to load notes.');
-      toast.error(err.message || 'Failed to load notes.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load notes.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +68,45 @@ export default function AllNotesPage() {
       // Add checks if needed to prevent initial double load.
   }, [lastNoteCreatedTimestamp, loadNotes, currentPage]); // Depend on timestamp
 
+  // Edit Handlers
+  const openEditModal = (note: Note) => {
+    setEditingNote(note);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingNote(null);
+  };
+
+  const handleUpdateSuccess = () => {
+    closeEditModal();
+    // Refresh the current page of notes
+    loadNotes(currentPage);
+    toast.success('Note updated successfully!'); // Add feedback
+  };
+
+  // Delete Handler
+  const handleDeleteNote = async (noteId: number) => {
+    // Confirmation dialog
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    const toastId = toast.loading('Deleting note...');
+    try {
+      await deleteNote(noteId); // Call API service
+      toast.success('Note deleted successfully!', { id: toastId });
+      // Reload notes after deletion
+      // The loadNotes function already handles adjusting the page if needed
+      loadNotes(currentPage); 
+    } catch (err) {
+      console.error("Failed to delete note:", err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete note.';
+      toast.error(errorMessage, { id: toastId });
+    }
+  };
+
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
   };
@@ -77,17 +126,34 @@ export default function AllNotesPage() {
       {error && <p className="text-red-500 text-center">Error: {error}</p>}
       
       {!isLoading && !error && (
-        <div className="flex-1 overflow-y-auto mb-4">
+        <div className="flex-1 overflow-y-auto mb-4 pr-2"> {/* Added padding-right */}
           {notes.length === 0 ? (
             <p className="text-gray-500 text-center italic">No notes found.</p>
           ) : (
             <ul className="space-y-3">
               {notes.map((note) => (
-                <li key={note.id} className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-                  <h3 className="font-medium text-gray-800 truncate mb-1">{note.title || 'Untitled Note'}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">{note.content || <span className="italic text-gray-400">No content</span>}</p>
-                  <p className="text-xs text-gray-400 mt-2">Created: {new Date(note.created_at).toLocaleDateString()}</p>
-                  {/* TODO: Add Edit/Delete buttons? Maybe link to canvas? */}
+                <li key={note.id} className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex justify-between items-start">
+                  <div className="flex-1 mr-4 overflow-hidden"> {/* Added overflow hidden */}
+                      <h3 className="font-medium text-gray-800 truncate mb-1">{note.title || 'Untitled Note'}</h3>
+                      <p className="text-sm text-gray-600 line-clamp-1">{note.content || <span className="italic text-gray-400">No content</span>}</p> 
+                      <p className="text-xs text-gray-400 mt-2">Created: {new Date(note.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex-shrink-0 flex space-x-2 mt-1"> 
+                    <button
+                      onClick={() => openEditModal(note)}
+                      className="text-blue-500 hover:text-blue-700 p-1"
+                      title="Edit Note"
+                    >
+                      <FiEdit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteNote(note.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Delete Note"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -117,6 +183,20 @@ export default function AllNotesPage() {
           </button>
         </div>
       )}
+
+      {/* Render Edit Modal */}
+      {editingNote && (
+          <NoteEditModal 
+              noteData={editingNote} 
+              isOpen={isEditModalOpen} 
+              onClose={closeEditModal}
+              onSave={async (updatedData) => { 
+                  await updateNote(editingNote.id, updatedData);
+                  handleUpdateSuccess(); // Close modal and refresh list on success
+              }}
+          />
+      )}
+
     </div>
   );
 } 

@@ -24,8 +24,9 @@ const CreateNoteForm: React.FC<CreateNoteFormProps> = ({ onCreate, isLoading }) 
       // Clear form on successful creation (handled by parent potentially)
       // setTitle('');
       // setContent('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to create note.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create note.';
+      setError(message);
     }
   };
 

@@ -10,13 +10,15 @@ export interface User {
 export interface Note {
   id: number;
   user_id: number;
-  title: string | null;
-  content: string | null;
+  title: string;
+  content: string | null; // Keep null possible if backend allows, but make required for creation
   userSummary?: string | null; // Added user summary
-  position_x?: number | null; // Optional position x
-  position_y?: number | null; // Optional position y
-  created_at: string; // Or Date
-  updated_at: string | null; // Or Date
+  tags?: string[]; // <<< ADDED OPTIONAL TAGS ARRAY
+  position_x?: number | null;
+  position_y?: number | null;
+  graph_node_id?: number | null;
+  created_at: string; // Typically string in JSON
+  updated_at?: string | null;
 }
 
 // Renamed from File to avoid conflict with global File type
@@ -41,6 +43,7 @@ export interface NoteUpdateData {
   title?: string | null; // Title is optional for update
   content?: string | null; // Content is optional
   userSummary?: string | null; // Add user summary
+  tags?: string[]; // <<< ADDED OPTIONAL TAGS ARRAY FOR UPDATES
   position_x?: number | null; // Position is optional for update
   position_y?: number | null; // Position is optional for update
 }

@@ -275,10 +275,10 @@ const SidePanel: React.FC = () => {
               <FiFileText className="mr-3 h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
               All Notes
             </Link>
-             <Link href="/dashboard/files" className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-50">
+             {/* <Link href="/dashboard/files" className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-50">
               <FiFolder className="mr-3 h-5 w-5 text-gray-400 group-hover:text-indigo-500" />
               All Files
-            </Link>
+            </Link> */}
         </nav>
         {/* Consider adding Files List here if desired */}
       </div>

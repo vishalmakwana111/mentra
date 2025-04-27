@@ -65,7 +65,10 @@ Text:
         # Split by comma, strip whitespace, convert to lowercase, filter empty strings
         tags = [tag.strip().lower() for tag in raw_llm_output.split(',') if tag.strip()]
 
-        logger.info(f"Parsed tags: {tags}")
+        # Limit to a maximum of two tags
+        tags = tags[:2]
+
+        logger.info(f"Parsed tags (limited to 2): {tags}")
         return tags
 
     except Exception as e:
