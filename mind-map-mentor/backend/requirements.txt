@@ -9,6 +9,7 @@ alembic
 python-dotenv
 pydantic
 pydantic-settings
+pydantic[email]
 
 # Auth
 passlib[bcrypt]
